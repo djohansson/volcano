@@ -1,0 +1,414 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		538E9F1C2120959B00524466 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 538E9F1A2120959B00524466 /* Main.storyboard */; };
+		538E9F562120996E00524466 /* imgui_impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F552120996E00524466 /* imgui_impl.cpp */; };
+		538E9F582120997C00524466 /* imgui_impl_osx.mm in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F572120997C00524466 /* imgui_impl_osx.mm */; };
+		538E9F602120998A00524466 /* Main.m in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F592120998A00524466 /* Main.m */; };
+		538E9F612120998A00524466 /* RenderView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F5B2120998A00524466 /* RenderView.mm */; };
+		538E9F622120998A00524466 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F5D2120998A00524466 /* ViewController.m */; };
+		538E9F632120998A00524466 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F5F2120998A00524466 /* AppDelegate.m */; };
+		53D052AB2120A38500BAFBC2 /* resources in Resources */ = {isa = PBXBuildFile; fileRef = 538E9F4A2120971300524466 /* resources */; };
+		53D052B72120A51B00BAFBC2 /* Volcano.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53D052B62120A51B00BAFBC2 /* Volcano.cpp */; };
+		53D052BA2120A54600BAFBC2 /* vulkan.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53D052B92120A54600BAFBC2 /* vulkan.framework */; };
+		53D052BB2120A56600BAFBC2 /* vulkan.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53D052B92120A54600BAFBC2 /* vulkan.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		53D052C92120A5F100BAFBC2 /* libMoltenVK.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53D052CB2120A62800BAFBC2 /* vulkan in Resources */ = {isa = PBXBuildFile; fileRef = 53D052CA2120A62800BAFBC2 /* vulkan */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		53D052AC2120A3BB00BAFBC2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				53D052BB2120A56600BAFBC2 /* vulkan.framework in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D052AE2120A3EB00BAFBC2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = ../lib;
+			dstSubfolderSpec = 6;
+			files = (
+				53D052C92120A5F100BAFBC2 /* libMoltenVK.dylib in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		538E9F032120951F00524466 /* volcano.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = volcano.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		538E9F112120952000524466 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		538E9F142120952100524466 /* volcano.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = volcano.entitlements; sourceTree = "<group>"; };
+		538E9F1B2120959B00524466 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		538E9F4A2120971300524466 /* resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = resources; path = ../../../resources; sourceTree = "<group>"; };
+		538E9F552120996E00524466 /* imgui_impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_impl.cpp; path = ../../../../src/imgui/imgui_impl.cpp; sourceTree = "<group>"; };
+		538E9F572120997C00524466 /* imgui_impl_osx.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = imgui_impl_osx.mm; path = ../../../../src/imgui/platform/osx/imgui_impl_osx.mm; sourceTree = "<group>"; };
+		538E9F592120998A00524466 /* Main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = Main.m; path = ../../../../src/platform/osx/Main.m; sourceTree = "<group>"; };
+		538E9F5A2120998A00524466 /* RenderView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RenderView.h; path = ../../../../src/platform/osx/RenderView.h; sourceTree = "<group>"; };
+		538E9F5B2120998A00524466 /* RenderView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = RenderView.mm; path = ../../../../src/platform/osx/RenderView.mm; sourceTree = "<group>"; };
+		538E9F5C2120998A00524466 /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = ../../../../src/platform/osx/AppDelegate.h; sourceTree = "<group>"; };
+		538E9F5D2120998A00524466 /* ViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ViewController.m; path = ../../../../src/platform/osx/ViewController.m; sourceTree = "<group>"; };
+		538E9F5E2120998A00524466 /* ViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ViewController.h; path = ../../../../src/platform/osx/ViewController.h; sourceTree = "<group>"; };
+		538E9F5F2120998A00524466 /* AppDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppDelegate.m; path = ../../../../src/platform/osx/AppDelegate.m; sourceTree = "<group>"; };
+		53D052B52120A51B00BAFBC2 /* Volcano.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Volcano.h; path = ../../../../src/Volcano.h; sourceTree = "<group>"; };
+		53D052B62120A51B00BAFBC2 /* Volcano.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Volcano.cpp; path = ../../../../src/Volcano.cpp; sourceTree = "<group>"; };
+		53D052B92120A54600BAFBC2 /* vulkan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = vulkan.framework; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks/vulkan.framework"; sourceTree = "<group>"; };
+		53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libMoltenVK.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/MoltenVK/macOS/libMoltenVK.dylib"; sourceTree = "<group>"; };
+		53D052CA2120A62800BAFBC2 /* vulkan */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vulkan; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/etc/vulkan"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		538E9F002120951F00524466 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53D052BA2120A54600BAFBC2 /* vulkan.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		538E9EFA2120951F00524466 = {
+			isa = PBXGroup;
+			children = (
+				53D052CA2120A62800BAFBC2 /* vulkan */,
+				53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */,
+				538E9F4A2120971300524466 /* resources */,
+				538E9F052120951F00524466 /* volcano */,
+				538E9F042120951F00524466 /* Products */,
+				53D052B82120A54600BAFBC2 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		538E9F042120951F00524466 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				538E9F032120951F00524466 /* volcano.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		538E9F052120951F00524466 /* volcano */ = {
+			isa = PBXGroup;
+			children = (
+				53D052B62120A51B00BAFBC2 /* Volcano.cpp */,
+				53D052B52120A51B00BAFBC2 /* Volcano.h */,
+				538E9F5C2120998A00524466 /* AppDelegate.h */,
+				538E9F5F2120998A00524466 /* AppDelegate.m */,
+				538E9F592120998A00524466 /* Main.m */,
+				538E9F5A2120998A00524466 /* RenderView.h */,
+				538E9F5B2120998A00524466 /* RenderView.mm */,
+				538E9F5E2120998A00524466 /* ViewController.h */,
+				538E9F5D2120998A00524466 /* ViewController.m */,
+				538E9F572120997C00524466 /* imgui_impl_osx.mm */,
+				538E9F552120996E00524466 /* imgui_impl.cpp */,
+				538E9F1A2120959B00524466 /* Main.storyboard */,
+				538E9F112120952000524466 /* Info.plist */,
+				538E9F142120952100524466 /* volcano.entitlements */,
+			);
+			path = volcano;
+			sourceTree = "<group>";
+		};
+		53D052B82120A54600BAFBC2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				53D052B92120A54600BAFBC2 /* vulkan.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		538E9F022120951F00524466 /* volcano */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 538E9F172120952100524466 /* Build configuration list for PBXNativeTarget "volcano" */;
+			buildPhases = (
+				538E9EFF2120951F00524466 /* Sources */,
+				538E9F002120951F00524466 /* Frameworks */,
+				538E9F012120951F00524466 /* Resources */,
+				53D052AC2120A3BB00BAFBC2 /* CopyFiles */,
+				53D052AE2120A3EB00BAFBC2 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = volcano;
+			productName = volcano;
+			productReference = 538E9F032120951F00524466 /* volcano.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		538E9EFB2120951F00524466 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0940;
+				ORGANIZATIONNAME = Ubisoft;
+				TargetAttributes = {
+					538E9F022120951F00524466 = {
+						CreatedOnToolsVersion = 9.4.1;
+					};
+				};
+			};
+			buildConfigurationList = 538E9EFE2120951F00524466 /* Build configuration list for PBXProject "volcano" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 538E9EFA2120951F00524466;
+			productRefGroup = 538E9F042120951F00524466 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				538E9F022120951F00524466 /* volcano */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		538E9F012120951F00524466 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53D052CB2120A62800BAFBC2 /* vulkan in Resources */,
+				53D052AB2120A38500BAFBC2 /* resources in Resources */,
+				538E9F1C2120959B00524466 /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		538E9EFF2120951F00524466 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				538E9F622120998A00524466 /* ViewController.m in Sources */,
+				53D052B72120A51B00BAFBC2 /* Volcano.cpp in Sources */,
+				538E9F582120997C00524466 /* imgui_impl_osx.mm in Sources */,
+				538E9F602120998A00524466 /* Main.m in Sources */,
+				538E9F612120998A00524466 /* RenderView.mm in Sources */,
+				538E9F562120996E00524466 /* imgui_impl.cpp in Sources */,
+				538E9F632120998A00524466 /* AppDelegate.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		538E9F1A2120959B00524466 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				538E9F1B2120959B00524466 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		538E9F152120952100524466 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		538E9F162120952100524466 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		538E9F182120952100524466 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = volcano/volcano.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks",
+					"$(PROJECT_DIR)/Frameworks",
+				);
+				HEADER_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/include",
+					/Users/danjo/Work/VulkanMemoryAllocator/src,
+					/Users/danjo/Work/imgui,
+					/Users/danjo/Work/stb,
+				);
+				INFOPLIST_FILE = volcano/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/lib";
+				PRODUCT_BUNDLE_IDENTIFIER = Ubisoft.volcano;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		538E9F192120952100524466 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = volcano/volcano.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks",
+					"$(PROJECT_DIR)/Frameworks",
+				);
+				HEADER_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/include",
+					/Users/danjo/Work/VulkanMemoryAllocator/src,
+					/Users/danjo/Work/imgui,
+					/Users/danjo/Work/stb,
+				);
+				INFOPLIST_FILE = volcano/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/lib";
+				PRODUCT_BUNDLE_IDENTIFIER = Ubisoft.volcano;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		538E9EFE2120951F00524466 /* Build configuration list for PBXProject "volcano" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				538E9F152120952100524466 /* Debug */,
+				538E9F162120952100524466 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		538E9F172120952100524466 /* Build configuration list for PBXNativeTarget "volcano" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				538E9F182120952100524466 /* Debug */,
+				538E9F192120952100524466 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 538E9EFB2120951F00524466 /* Project object */;
+}
