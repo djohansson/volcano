@@ -1,7 +1,14 @@
 #include "Volcano.h"
 
 #include <vulkan/vulkan.h>
+#ifdef _WINDOWS
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#include <windows.h>
+#include <vulkan/vulkan_win32.h>
+#else
 #include <vulkan/vulkan_macos.h>
+#endif
 
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -21,7 +28,6 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -175,7 +181,7 @@ public:
         
         const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
         const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-        myWindowData.SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(myPhysicalDevice, myWindowData.Surface, requestSurfaceImageFormat, sizeof_array(requestSurfaceImageFormat), requestSurfaceColorSpace);
+        myWindowData.SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(myPhysicalDevice, myWindowData.Surface, requestSurfaceImageFormat, static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)), requestSurfaceColorSpace);
         
         VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
         myWindowData.PresentMode = ImGui_ImplVulkanH_SelectPresentMode(myPhysicalDevice, myWindowData.Surface, &presentMode, 1);
@@ -216,8 +222,8 @@ public:
         initIMGUI(height, width);
         
         // upload geometry
-        createDeviceLocalBuffer(ourVertices, sizeof_array(ourVertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer, myVertexBufferMemory);
-        createDeviceLocalBuffer(ourIndices, sizeof_array(ourIndices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myIndexBuffer, myIndexBufferMemory);
+        createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer, myVertexBufferMemory);
+        createDeviceLocalBuffer(ourIndices, static_cast<uint32_t>(sizeof_array(ourIndices)), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myIndexBuffer, myIndexBufferMemory);
         
         // upload textures
         {
@@ -248,7 +254,7 @@ public:
         cleanup();
     }
     
-    void draw(uint frameIndex)
+    void draw(uint32_t frameIndex)
     {
         ImGui_ImplVulkan_NewFrame();
         ImGui::NewFrame();
@@ -319,7 +325,7 @@ private:
         {
             std::unique_ptr<VkLayerProperties[]> instanceLayers(new VkLayerProperties[instanceLayerCount]);
             CHECK_VK(vkEnumerateInstanceLayerProperties(&instanceLayerCount, instanceLayers.get()));
-            for (int i = 0; i < instanceLayerCount; ++i)
+            for (uint32_t i = 0; i < instanceLayerCount; ++i)
                 std::cout << instanceLayers[i].layerName << "\n";
         }
         
@@ -335,7 +341,7 @@ private:
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableInstanceExtensions.data());
         
         std::vector<const char*> instanceExtensions(instanceExtensionCount);
-        for (uint i = 0; i < instanceExtensionCount; i++)
+        for (uint32_t i = 0; i < instanceExtensionCount; i++)
             instanceExtensions[i] = availableInstanceExtensions[i].extensionName;
         
         std::sort(instanceExtensions.begin(), instanceExtensions.end(), [](const char* lhs, const char* rhs)
@@ -346,7 +352,11 @@ private:
         std::vector<const char*> requiredExtensions =
         {
             "VK_KHR_surface",
+#ifdef _WINDOWS
+			"VK_KHR_win32_surface",
+#else
             "VK_MVK_macos_surface",
+#endif
         };
         
         assert(std::includes(instanceExtensions.begin(), instanceExtensions.end(), requiredExtensions.begin(), requiredExtensions.end(), [](const char* lhs, const char* rhs)
@@ -379,6 +389,16 @@ private:
     
     void createSurface(void* view)
     {
+#ifdef _WINDOWS
+		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.flags = 0;
+		surfaceCreateInfo.hwnd = (HWND)view;
+		surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
+		auto vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateWin32SurfaceKHR");
+		assert(vkCreateWin32SurfaceKHR != nullptr);
+		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
+#else
         VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
         surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
         surfaceCreateInfo.flags = 0;
@@ -386,6 +406,7 @@ private:
         auto vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr(myInstance, "vkCreateMacOSSurfaceMVK");
         assert(vkCreateMacOSSurfaceMVK != nullptr);
         CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
+#endif
     }
     
     void createDevice()
@@ -485,7 +506,7 @@ private:
     
     void createDescriptorPool()
     {
-        constexpr uint maxDescriptorCount = 1000;
+        constexpr uint32_t maxDescriptorCount = 1000;
         VkDescriptorPoolSize poolSizes[] =
         {
             { VK_DESCRIPTOR_TYPE_SAMPLER, maxDescriptorCount },
@@ -505,7 +526,7 @@ private:
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = (uint32_t)sizeof_array(poolSizes);
         poolInfo.pPoolSizes = poolSizes;
-        poolInfo.maxSets = maxDescriptorCount * sizeof_array(poolSizes);
+        poolInfo.maxSets = maxDescriptorCount * static_cast<uint32_t>(sizeof_array(poolSizes));
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         
         CHECK_VK(vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
@@ -785,7 +806,7 @@ private:
     }
     
     template <typename T>
-    void createDeviceLocalBuffer(const T* bufferData, uint bufferElementCount, VkBufferUsageFlags usage, VkBuffer& outBuffer, VmaAllocation& outBufferMemory)
+    void createDeviceLocalBuffer(const T* bufferData, uint32_t bufferElementCount, VkBufferUsageFlags usage, VkBuffer& outBuffer, VmaAllocation& outBufferMemory)
     {
         assert(bufferData != nullptr);
         assert(bufferElementCount > 0);
@@ -853,7 +874,7 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
     
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint width, uint height)
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
         
@@ -866,20 +887,20 @@ private:
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
         region.imageOffset = { 0, 0, 0 };
-        region.imageExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 };
+        region.imageExtent = { width, height, 1 };
         
         vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         
         endSingleTimeCommands(commandBuffer);
     }
     
-    void createImage2D(uint width, uint height, uint pixelSizeBytes, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryFlags, VkImage& outImage, VmaAllocation& outImageMemory)
+    void createImage2D(uint32_t width, uint32_t height, uint32_t pixelSizeBytes, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryFlags, VkImage& outImage, VmaAllocation& outImageMemory)
     {
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = static_cast<uint32_t>(width);
-        imageInfo.extent.height = static_cast<uint32_t>(height);
+        imageInfo.extent.width = width;
+        imageInfo.extent.height = height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
@@ -901,7 +922,7 @@ private:
     }
     
     template <typename T>
-    void createDeviceLocalImage2D(const T* imageData, uint width, uint height, uint pixelSizeBytes, VkImageUsageFlags usage, VkImage& outImage, VmaAllocation& outImageMemory)
+    void createDeviceLocalImage2D(const T* imageData, uint32_t width, uint32_t height, uint32_t pixelSizeBytes, VkImageUsageFlags usage, VkImage& outImage, VmaAllocation& outImageMemory)
     {
         VkDeviceSize imageSize = width * height * pixelSizeBytes;
         
@@ -989,7 +1010,7 @@ private:
             throw std::runtime_error("failed to flip swap chain image!");
     }
     
-    void updateUniformBuffer(uint frameIndex)
+    void updateUniformBuffer(uint32_t frameIndex)
     {
         int period = static_cast<int>(60.0f / myAnimationSpeed);
         float t = static_cast<float>(frameIndex % period) / period;
@@ -1015,7 +1036,7 @@ private:
         vmaUnmapMemory(myAllocator, myUniformBufferMemory);
     }
     
-    void submitFrame(uint frameIndex)
+    void submitFrame(uint32_t frameIndex)
     {
         ImGui_ImplVulkanH_FrameData* oldFrame = &myWindowData.Frames[myWindowData.FrameIndex];
         VkSemaphore& imageAquiredSemaphore = oldFrame->ImageAcquiredSemaphore;
@@ -1104,7 +1125,7 @@ private:
         }
     }
     
-    void presentFrame(uint frameIndex)
+    void presentFrame(uint32_t frameIndex)
     {
         ImGui_ImplVulkanH_FrameData* fd = &myWindowData.Frames[myWindowData.FrameIndex];
         VkPresentInfoKHR info = {};
@@ -1196,8 +1217,8 @@ private:
         
         assert(!swapChainInfo.presentModes.empty());
         
-        if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // lets run on the integrated for now to safe battery
-            deviceFeatures.samplerAnisotropy)
+        //if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // lets run on the integrated for now to safe battery
+        //    deviceFeatures.samplerAnisotropy)
         {
             uint32_t queueFamilyCount = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
