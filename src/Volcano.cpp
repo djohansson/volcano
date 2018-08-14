@@ -329,7 +329,7 @@ private:
                 std::cout << instanceLayers[i].layerName << "\n";
         }
         
-        const char * enabledLayerNames[] =
+        const char* enabledLayerNames[] =
         {
             "VK_LAYER_LUNARG_standard_validation"
         };
@@ -351,6 +351,7 @@ private:
         
         std::vector<const char*> requiredExtensions =
         {
+			// must be sorted lexicographically for std::includes to work!
             "VK_KHR_surface",
 #ifdef _WINDOWS
 			"VK_KHR_win32_surface",
@@ -363,6 +364,9 @@ private:
         {
             return strcmp(lhs, rhs) < 0;
         }));
+
+		//if (std::find(instanceExtensions.begin(), instanceExtensions.end(), "VK_KHR_display") == instanceExtensions.end())
+		//	instanceExtensions.push_back("VK_KHR_display");
         
         VkInstanceCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;

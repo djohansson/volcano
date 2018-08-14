@@ -1,0 +1,4 @@
+
+workspaces/vs2017/volcano/.vs/*
+workspaces/vs2017/volcano/x86/*
+workspaces/vs2017/volcano/x64/*
