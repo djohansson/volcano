@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "/home/djohansson/Code/volcano"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"assert.h": "c",
+			"vk_sdk_platform.h": "c",
+			"cmath": "cpp"
+		},
+		"workbench.startupEditor": "newUntitledFile",
+    	"editor.detectIndentation": false,
+		"editor.insertSpaces": false,
+		"window.zoomLevel": 0,
+		"C_Cpp.loggingLevel": "Debug"
+	}
+}
