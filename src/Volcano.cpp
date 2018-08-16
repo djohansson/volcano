@@ -470,16 +470,40 @@ class VulkanApplication
 		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr,
 										 &myWindowData.Surface));
 #elif defined(__linux__)
-		// todo: not implemented yet
-		// VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
-		// surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-		// surfaceCreateInfo.flags = 0;
-		// surfaceCreateInfo.connection = view;
-		// surfaceCreateInfo.window = view;
-		// auto vkCreateXcbSurfaceKHR = (PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(myInstance,
-		// "vkCreateXcbSurfaceKHR"); assert(vkCreateXcbSurfaceKHR != nullptr);
-		// CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr,
-		// &myWindowData.Surface));
+#	if defined(VK_USE_PLATFORM_XCB_KHR)
+		VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.flags = 0;
+		surfaceCreateInfo.connection = nullptr;//?;
+		surfaceCreateInfo.window = nullptr;//?;
+		auto vkCreateXcbSurfaceKHR =
+			(PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXcbSurfaceKHR");
+		assert(vkCreateXcbSurfaceKHR != nullptr);
+		CHECK_VK(
+			vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
+#	elif defined(VK_USE_PLATFORM_XLIB_KHR)
+		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.flags = 0;
+		surfaceCreateInfo.dpy = nullptr;//?;
+    	surfaceCreateInfo.window = nullptr;//?;
+		auto vkCreateXlibSurfaceKHR =
+			(PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXlibSurfaceKHR");
+		assert(vkCreateXlibSurfaceKHR != nullptr);
+		CHECK_VK(
+			vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
+#	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+		VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {};
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.flags = 0;
+    	surfaceCreateInfo.wl_display = nullptr;//?;
+    	surfaceCreateInfo.wl_surface = nullptr;//?;
+		auto vkCreateWaylandSurfaceKHR =
+			(PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateWaylandSurfaceKHR");
+		assert(vkCreateWaylandSurfaceKHR != nullptr);
+		CHECK_VK(
+			vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
+#	endif
 #endif
 	}
 
