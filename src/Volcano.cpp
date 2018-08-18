@@ -2,15 +2,16 @@
 
 #include <vulkan/vulkan.h>
 
+#if defined(_WIN32)
+#define NOMINMAX
+#include <wtypes.h>
+#endif
+
 #if defined(VOLCANO_USE_GLFW)
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #elif defined(_WIN32)
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
-#include <windows.h>
-
 #include <vulkan/vulkan_win32.h>
 #elif defined(__APPLE__)
 #include <vulkan/vulkan_macos.h>
@@ -170,94 +171,6 @@ struct UniformBufferObject
 class VulkanApplication
 {
   public:
-	void initIMGUI(int height, int width, VkSurfaceKHR surface)
-	{
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-		ImGuiIO& io = ImGui::GetIO();
-		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-
-		ImFontConfig config;
-		config.OversampleH = 2;
-		config.OversampleV = 2;
-		config.PixelSnapH = false;
-
-		io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Cousine-Regular.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/DroidSans.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Karla-Regular.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/ProggyClean.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/ProggyTiny.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Roboto-Medium.ttf")).c_str(), 16.0f, &config));
-
-		// Setup style
-		ImGui::StyleColorsClassic();
-		io.FontDefault = myFonts.back();
-
-		const VkFormat requestSurfaceImageFormat[] = {
-			VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM,
-			VK_FORMAT_R8G8B8_UNORM};
-		const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-		VkSurfaceFormatKHR surfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
-			myPhysicalDevice, surface, requestSurfaceImageFormat,
-			static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)),
-			requestSurfaceColorSpace);
-
-		VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-		presentMode = ImGui_ImplVulkanH_SelectPresentMode(
-			myPhysicalDevice, surface, &presentMode, 1);
-
-		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2);
-
-		myWindowData->SurfaceFormat = surfaceFormat;
-		myWindowData->Surface = surface;
-		myWindowData->PresentMode = presentMode;
-
-		myWindowData->ClearValue.color.float32[0] = 0.4f;
-		myWindowData->ClearValue.color.float32[1] = 0.4f;
-		myWindowData->ClearValue.color.float32[2] = 0.5f;
-		myWindowData->ClearValue.color.float32[3] = 1.0f;
-
-		// Create SwapChain, RenderPass, Framebuffer, etc.
-		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
-			myPhysicalDevice, myDevice, myWindowData.get(), myAllocator->GetAllocationCallbacks(),
-			width, height, true);
-		ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myPhysicalDevice, myDevice,
-														 myQueueFamilyIndex, myWindowData.get(),
-														 myAllocator->GetAllocationCallbacks());
-
-		// Setup Vulkan binding
-		ImGui_ImplVulkan_InitInfo initInfo = {};
-		initInfo.Instance = myInstance;
-		initInfo.PhysicalDevice = myPhysicalDevice;
-		initInfo.Device = myDevice;
-		initInfo.QueueFamily = myQueueFamilyIndex;
-		initInfo.Queue = myQueue;
-		initInfo.PipelineCache = VK_NULL_HANDLE;
-		initInfo.DescriptorPool = myDescriptorPool;
-		initInfo.Allocator = myAllocator->GetAllocationCallbacks();
-		initInfo.CheckVkResultFn = CHECK_VK;
-		ImGui_ImplVulkan_Init(&initInfo, myWindowData->RenderPass);
-
-		// Upload Fonts
-		{
-			VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-			ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-			endSingleTimeCommands(commandBuffer);
-			ImGui_ImplVulkan_InvalidateFontUploadObjects();
-		}
-
-		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
-		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
-	}
-
 	VulkanApplication(void* view, int width, int height, const char* resourcePath)
 		: myResourcePath(resourcePath)
 	{
@@ -307,7 +220,7 @@ class VulkanApplication
 		cleanup();
 	}
 
-	void draw(uint32_t frameIndex)
+	void draw()
 	{
 		ImGui_ImplVulkan_NewFrame();
 		ImGui::NewFrame();
@@ -353,10 +266,9 @@ class VulkanApplication
 
 		ImGui::Render();
 
-		updateUniformBuffer(frameIndex);
-
-		submitFrame(frameIndex);
-		presentFrame(frameIndex);
+		updateUniformBuffer();
+		submitFrame();
+		presentFrame();
 	}
 
   private:
@@ -573,20 +485,6 @@ class VulkanApplication
 
 		std::sort(deviceExtensions.begin(), deviceExtensions.end(),
 				  [](const char* lhs, const char* rhs) { return strcmp(lhs, rhs) < 0; });
-
-		/*
-		 static const std::vector<const char*> requiredExtensions =
-		 {
-		 "VK_KHR_get_memory_requirements2",
-		 "VK_KHR_dedicated_allocation",
-		 };
-
-		 assert(std::includes(deviceExtensions.begin(), deviceExtensions.end(),
-		 requiredExtensions.begin(), requiredExtensions.end(), [](const char* lhs, const char* rhs)
-		 {
-		 return strcmp(lhs, rhs) < 0;
-		 }));
-		 */
 
 		VkDeviceCreateInfo deviceCreateInfo = {};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -849,7 +747,6 @@ class VulkanApplication
 		pipelineInfo.pColorBlendState = &colorBlending;
 		pipelineInfo.pDynamicState = nullptr;
 		pipelineInfo.layout = myPipelineLayout;
-		// pipelineInfo.renderPass = myRenderPass;
 		pipelineInfo.renderPass = myWindowData->RenderPass;
 		pipelineInfo.subpass = 0;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -1139,6 +1036,94 @@ class VulkanApplication
 		createDescriptorPool();
 	}
 
+	void initIMGUI(int height, int width, VkSurfaceKHR surface)
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO();
+		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+		ImFontConfig config;
+		config.OversampleH = 2;
+		config.OversampleV = 2;
+		config.PixelSnapH = false;
+
+		io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/Cousine-Regular.ttf")).c_str(), 16.0f, &config));
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/DroidSans.ttf")).c_str(), 16.0f, &config));
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/Karla-Regular.ttf")).c_str(), 16.0f, &config));
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/ProggyClean.ttf")).c_str(), 16.0f, &config));
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/ProggyTiny.ttf")).c_str(), 16.0f, &config));
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
+			(myResourcePath + std::string("fonts/Roboto-Medium.ttf")).c_str(), 16.0f, &config));
+
+		// Setup style
+		ImGui::StyleColorsClassic();
+		io.FontDefault = myFonts.back();
+
+		const VkFormat requestSurfaceImageFormat[] = {
+			VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM,
+			VK_FORMAT_R8G8B8_UNORM };
+		const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+		VkSurfaceFormatKHR surfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
+			myPhysicalDevice, surface, requestSurfaceImageFormat,
+			static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)),
+			requestSurfaceColorSpace);
+
+		VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+		presentMode = ImGui_ImplVulkanH_SelectPresentMode(
+			myPhysicalDevice, surface, &presentMode, 1);
+
+		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2);
+
+		myWindowData->SurfaceFormat = surfaceFormat;
+		myWindowData->Surface = surface;
+		myWindowData->PresentMode = presentMode;
+
+		myWindowData->ClearValue.color.float32[0] = 0.4f;
+		myWindowData->ClearValue.color.float32[1] = 0.4f;
+		myWindowData->ClearValue.color.float32[2] = 0.5f;
+		myWindowData->ClearValue.color.float32[3] = 1.0f;
+
+		// Create SwapChain, RenderPass, Framebuffer, etc.
+		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
+			myPhysicalDevice, myDevice, myWindowData.get(), myAllocator->GetAllocationCallbacks(),
+			width, height, true);
+		ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myPhysicalDevice, myDevice,
+			myQueueFamilyIndex, myWindowData.get(),
+			myAllocator->GetAllocationCallbacks());
+
+		// Setup Vulkan binding
+		ImGui_ImplVulkan_InitInfo initInfo = {};
+		initInfo.Instance = myInstance;
+		initInfo.PhysicalDevice = myPhysicalDevice;
+		initInfo.Device = myDevice;
+		initInfo.QueueFamily = myQueueFamilyIndex;
+		initInfo.Queue = myQueue;
+		initInfo.PipelineCache = VK_NULL_HANDLE;
+		initInfo.DescriptorPool = myDescriptorPool;
+		initInfo.Allocator = myAllocator->GetAllocationCallbacks();
+		initInfo.CheckVkResultFn = CHECK_VK;
+		ImGui_ImplVulkan_Init(&initInfo, myWindowData->RenderPass);
+
+		// Upload Fonts
+		{
+			VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+			ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+			endSingleTimeCommands(commandBuffer);
+			ImGui_ImplVulkan_InvalidateFontUploadObjects();
+		}
+
+		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
+		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
+	}
+
 	void checkFlipOrPresentResult(VkResult result)
 	{
 		if (result == VK_SUBOPTIMAL_KHR)
@@ -1151,10 +1136,8 @@ class VulkanApplication
 			throw std::runtime_error("failed to flip swap chain image!");
 	}
 
-	void updateUniformBuffer(uint32_t frameIndex)
+	void updateUniformBuffer()
 	{
-		// int period = static_cast<int>(60.0f / myAnimationSpeed);
-		// float t = static_cast<float>(frameIndex % period) / period;
 		static auto start = std::chrono::high_resolution_clock::now();
 		auto now = std::chrono::high_resolution_clock::now();
 		constexpr float period = 5.0f;
@@ -1182,7 +1165,7 @@ class VulkanApplication
 		vmaUnmapMemory(myAllocator, myUniformBufferMemory);
 	}
 
-	void submitFrame(uint32_t frameIndex)
+	void submitFrame()
 	{
 		ImGui_ImplVulkanH_FrameData* oldFrame = &myWindowData->Frames[myWindowData->FrameIndex];
 		VkSemaphore& imageAquiredSemaphore = oldFrame->ImageAcquiredSemaphore;
@@ -1190,9 +1173,6 @@ class VulkanApplication
 		checkFlipOrPresentResult(vkAcquireNextImageKHR(myDevice, myWindowData->Swapchain,
 													   UINT64_MAX, imageAquiredSemaphore,
 													   VK_NULL_HANDLE, &myWindowData->FrameIndex));
-
-		// std::cout << "FrameIndex: " << myWindowData->FrameIndex << std::endl;
-
 		/*
 		{
 			VkAcquireNextImageInfoKHR nextImageInfo = {};
@@ -1277,7 +1257,7 @@ class VulkanApplication
 		}
 	}
 
-	void presentFrame(uint32_t frameIndex)
+	void presentFrame()
 	{
 		ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[myWindowData->FrameIndex];
 		VkPresentInfoKHR info = {};
@@ -1377,7 +1357,7 @@ class VulkanApplication
 		assert(!swapChainInfo.presentModes.empty());
 
 		// if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // lets run on
-		// the integrated for now to safe battery
+		// the integrated for now to save battery
 		//    deviceFeatures.samplerAnisotropy)
 		{
 			uint32_t queueFamilyCount = 0;
@@ -1486,9 +1466,9 @@ void vkapp_destroy()
 	delete theApp;
 }
 
-void vkapp_draw(unsigned int frame)
+void vkapp_draw()
 {
 	assert(theApp != nullptr);
 
-	theApp->draw(frame);
+	theApp->draw();
 }

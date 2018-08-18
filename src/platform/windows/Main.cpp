@@ -24,7 +24,6 @@ HINSTANCE g_hInst;                              // current instance
 HWND g_hWnd;									// main window
 WCHAR g_szTitle[MAX_LOADSTRING];                // The title bar text
 WCHAR g_szWindowClass[MAX_LOADSTRING];          // the main window class name
-unsigned int g_frameIndex = 0;
 bool g_initialized = false;
 
 int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet)
@@ -251,7 +250,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (g_initialized)
 		{
 			ImGui_ImplWin32_NewFrame();
-			vkapp_draw(g_frameIndex++);
+			vkapp_draw();
 		}
 		break;
 	}
