@@ -3,27 +3,28 @@
 #include <vulkan/vulkan.h>
 
 #if defined(VOLCANO_USE_GLFW)
-#	define GLFW_INCLUDE_NONE
-#	define GLFW_INCLUDE_VULKAN
-#	include <GLFW/glfw3.h>
+#define GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 #elif defined(_WIN32)
-#	define NOMINMAX
-#	define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
-#	include <vulkan/vulkan_win32.h>
-#	include <windows.h>
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
+#include <windows.h>
+
+#include <vulkan/vulkan_win32.h>
 #elif defined(__APPLE__)
-#	include <vulkan/vulkan_macos.h>
+#include <vulkan/vulkan_macos.h>
 #elif defined(__linux__)
-#	if defined(VK_USE_PLATFORM_XCB_KHR)
-#		include <X11/Xutil.h>
-#		include <vulkan/vulkan_xcb.h>
-#	elif defined(VK_USE_PLATFORM_XLIB_KHR)
-#		include <X11/Xutil.h>
-#		include <vulkan/vulkan_xlib.h>
-#	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-#		include <linux/input.h>
-#		include <vulkan/vulkan_wayland.h>
-#	endif
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+#include <X11/Xutil.h>
+#include <vulkan/vulkan_xcb.h>
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
+#include <X11/Xutil.h>
+#include <vulkan/vulkan_xlib.h>
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#include <linux/input.h>
+#include <vulkan/vulkan_wayland.h>
+#endif
 #endif
 
 #define VMA_IMPLEMENTATION
@@ -169,7 +170,7 @@ struct UniformBufferObject
 class VulkanApplication
 {
   public:
-	void initIMGUI(int height, int width)
+	void initIMGUI(int height, int width, VkSurfaceKHR surface)
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -199,31 +200,38 @@ class VulkanApplication
 		// Setup style
 		ImGui::StyleColorsClassic();
 		io.FontDefault = myFonts.back();
-		myWindowData.ClearValue.color.float32[0] = 0.4f;
-		myWindowData.ClearValue.color.float32[1] = 0.4f;
-		myWindowData.ClearValue.color.float32[2] = 0.5f;
-		myWindowData.ClearValue.color.float32[3] = 1.0f;
 
 		const VkFormat requestSurfaceImageFormat[] = {
 			VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM,
 			VK_FORMAT_R8G8B8_UNORM};
 		const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-		myWindowData.SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
-			myPhysicalDevice, myWindowData.Surface, requestSurfaceImageFormat,
+		VkSurfaceFormatKHR surfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
+			myPhysicalDevice, surface, requestSurfaceImageFormat,
 			static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)),
 			requestSurfaceColorSpace);
 
-		VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-		myWindowData.PresentMode = ImGui_ImplVulkanH_SelectPresentMode(
-			myPhysicalDevice, myWindowData.Surface, &presentMode, 1);
+		VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+		presentMode = ImGui_ImplVulkanH_SelectPresentMode(
+			myPhysicalDevice, surface, &presentMode, 1);
+
+		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2);
+
+		myWindowData->SurfaceFormat = surfaceFormat;
+		myWindowData->Surface = surface;
+		myWindowData->PresentMode = presentMode;
+
+		myWindowData->ClearValue.color.float32[0] = 0.4f;
+		myWindowData->ClearValue.color.float32[1] = 0.4f;
+		myWindowData->ClearValue.color.float32[2] = 0.5f;
+		myWindowData->ClearValue.color.float32[3] = 1.0f;
 
 		// Create SwapChain, RenderPass, Framebuffer, etc.
-		ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myPhysicalDevice, myDevice,
-														 myQueueFamilyIndex, &myWindowData,
-														 myAllocator->GetAllocationCallbacks());
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
-			myPhysicalDevice, myDevice, &myWindowData, myAllocator->GetAllocationCallbacks(), width,
-			height, true);
+			myPhysicalDevice, myDevice, myWindowData.get(), myAllocator->GetAllocationCallbacks(),
+			width, height, true);
+		ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myPhysicalDevice, myDevice,
+														 myQueueFamilyIndex, myWindowData.get(),
+														 myAllocator->GetAllocationCallbacks());
 
 		// Setup Vulkan binding
 		ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -236,7 +244,7 @@ class VulkanApplication
 		initInfo.DescriptorPool = myDescriptorPool;
 		initInfo.Allocator = myAllocator->GetAllocationCallbacks();
 		initInfo.CheckVkResultFn = CHECK_VK;
-		ImGui_ImplVulkan_Init(&initInfo, myWindowData.RenderPass);
+		ImGui_ImplVulkan_Init(&initInfo, myWindowData->RenderPass);
 
 		// Upload Fonts
 		{
@@ -247,14 +255,15 @@ class VulkanApplication
 		}
 
 		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
-		myWindowData.FrameIndex = static_cast<uint32_t>(sizeof_array(myWindowData.Frames)) - 1;
+		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
 	}
 
 	VulkanApplication(void* view, int width, int height, const char* resourcePath)
 		: myResourcePath(resourcePath)
 	{
-		initVulkan(view);
-		initIMGUI(height, width);
+		VkSurfaceKHR surface = VK_NULL_HANDLE;
+		initVulkan(view, surface);
+		initIMGUI(height, width, surface);
 
 		// upload geometry
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
@@ -315,8 +324,8 @@ class VulkanApplication
 
 		{
 			ImGui::Begin("Render Options");
-			ImGui::Checkbox("Clear Enable", &myWindowData.ClearEnable);
-			ImGui::ColorEdit3("Clear Color", &myWindowData.ClearValue.color.float32[0]);
+			ImGui::Checkbox("Clear Enable", &myWindowData->ClearEnable);
+			ImGui::ColorEdit3("Clear Color", &myWindowData->ClearValue.color.float32[0]);
 			ImGui::End();
 		}
 
@@ -396,13 +405,13 @@ class VulkanApplication
 #elif defined(__APPLE__)
 			"VK_MVK_macos_surface",
 #elif defined(__linux__)
-#	if defined(VK_USE_PLATFORM_XCB_KHR)
+#if defined(VK_USE_PLATFORM_XCB_KHR)
 			"VK_KHR_xcb_surface",
-#	elif defined(VK_USE_PLATFORM_XLIB_KHR)
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
 			"VK_KHR_xlib_surface",
-#	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 			"VK_KHR_wayland_surface",
-#	endif
+#endif
 #endif
 		};
 
@@ -443,11 +452,11 @@ class VulkanApplication
 												&myDebugCallback));
 	}
 
-	void createSurface(void* view)
+	void createSurface(void* view, VkSurfaceKHR& outSurface)
 	{
 #if defined(VOLCANO_USE_GLFW)
 		CHECK_VK(glfwCreateWindowSurface(myInstance, reinterpret_cast<GLFWwindow*>(view), nullptr,
-										 &myWindowData.Surface));
+										 &myWindowData->Surface));
 #elif defined(_WIN32)
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -457,8 +466,7 @@ class VulkanApplication
 		auto vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(
 			myInstance, "vkCreateWin32SurfaceKHR");
 		assert(vkCreateWin32SurfaceKHR != nullptr);
-		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr,
-										 &myWindowData.Surface));
+		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
 #elif defined(__APPLE__)
 		VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
@@ -467,47 +475,43 @@ class VulkanApplication
 		auto vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr(
 			myInstance, "vkCreateMacOSSurfaceMVK");
 		assert(vkCreateMacOSSurfaceMVK != nullptr);
-		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr,
-										 &myWindowData.Surface));
+		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
 #elif defined(__linux__)
-#	if defined(VK_USE_PLATFORM_XCB_KHR)
+#if defined(VK_USE_PLATFORM_XCB_KHR)
 		VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.connection = nullptr;//?;
-		surfaceCreateInfo.window = nullptr;//?;
+		surfaceCreateInfo.connection = nullptr; //?;
+		surfaceCreateInfo.window = nullptr; //?;
 		auto vkCreateXcbSurfaceKHR =
 			(PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXcbSurfaceKHR");
 		assert(vkCreateXcbSurfaceKHR != nullptr);
-		CHECK_VK(
-			vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
-#	elif defined(VK_USE_PLATFORM_XLIB_KHR)
+		CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
 		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.flags = 0;
-		surfaceCreateInfo.dpy = nullptr;//?;
-    	surfaceCreateInfo.window = nullptr;//?;
+		surfaceCreateInfo.dpy = nullptr; //?;
+		surfaceCreateInfo.window = nullptr; //?;
 		auto vkCreateXlibSurfaceKHR =
 			(PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXlibSurfaceKHR");
 		assert(vkCreateXlibSurfaceKHR != nullptr);
-		CHECK_VK(
-			vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
-#	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+		CHECK_VK(vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 		VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
 		surfaceCreateInfo.flags = 0;
-    	surfaceCreateInfo.wl_display = nullptr;//?;
-    	surfaceCreateInfo.wl_surface = nullptr;//?;
-		auto vkCreateWaylandSurfaceKHR =
-			(PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateWaylandSurfaceKHR");
+		surfaceCreateInfo.wl_display = nullptr; //?;
+		surfaceCreateInfo.wl_surface = nullptr; //?;
+		auto vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(
+			myInstance, "vkCreateWaylandSurfaceKHR");
 		assert(vkCreateWaylandSurfaceKHR != nullptr);
-		CHECK_VK(
-			vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &myWindowData.Surface));
-#	endif
+		CHECK_VK(vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+#endif
 #endif
 	}
 
-	void createDevice()
+	void createDevice(VkSurfaceKHR surface)
 	{
 		uint32_t deviceCount = 0;
 		CHECK_VK(vkEnumeratePhysicalDevices(myInstance, &deviceCount, nullptr));
@@ -519,7 +523,7 @@ class VulkanApplication
 
 		for (const auto& device : devices)
 		{
-			myQueueFamilyIndex = isDeviceSuitable(myInstance, myWindowData.Surface, device);
+			myQueueFamilyIndex = isDeviceSuitable(myInstance, surface, device);
 			if (myQueueFamilyIndex >= 0)
 			{
 				myPhysicalDevice = device;
@@ -757,15 +761,15 @@ class VulkanApplication
 		VkViewport viewport = {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = (float)(myWindowData.Width);
-		viewport.height = (float)(myWindowData.Height);
+		viewport.width = (float)(myWindowData->Width);
+		viewport.height = (float)(myWindowData->Height);
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 
 		VkRect2D scissor = {};
 		scissor.offset = {0, 0};
-		scissor.extent = {static_cast<uint32_t>(myWindowData.Width),
-						  static_cast<uint32_t>(myWindowData.Height)};
+		scissor.extent = {static_cast<uint32_t>(myWindowData->Width),
+						  static_cast<uint32_t>(myWindowData->Height)};
 
 		VkPipelineViewportStateCreateInfo viewportState = {};
 		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -846,7 +850,7 @@ class VulkanApplication
 		pipelineInfo.pDynamicState = nullptr;
 		pipelineInfo.layout = myPipelineLayout;
 		// pipelineInfo.renderPass = myRenderPass;
-		pipelineInfo.renderPass = myWindowData.RenderPass;
+		pipelineInfo.renderPass = myWindowData->RenderPass;
 		pipelineInfo.subpass = 0;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1;
@@ -860,8 +864,9 @@ class VulkanApplication
 
 	VkCommandBuffer beginSingleTimeCommands()
 	{
-		VkCommandPool commandPool = myWindowData.Frames[myWindowData.FrameIndex].CommandPool;
-		VkCommandBuffer commandBuffer = myWindowData.Frames[myWindowData.FrameIndex].CommandBuffer;
+		VkCommandPool commandPool = myWindowData->Frames[myWindowData->FrameIndex].CommandPool;
+		VkCommandBuffer commandBuffer =
+			myWindowData->Frames[myWindowData->FrameIndex].CommandBuffer;
 
 		CHECK_VK(vkResetCommandPool(myDevice, commandPool, 0));
 
@@ -1124,12 +1129,12 @@ class VulkanApplication
 		CHECK_VK(vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
-	void initVulkan(void* window)
+	void initVulkan(void* window, VkSurfaceKHR& outSurface)
 	{
 		createInstance();
 		createDebugCallback();
-		createSurface(window);
-		createDevice();
+		createSurface(window, outSurface);
+		createDevice(outSurface);
 		createAllocator();
 		createDescriptorPool();
 	}
@@ -1140,17 +1145,22 @@ class VulkanApplication
 			return; // not much we can do
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 			ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
-				myPhysicalDevice, myDevice, &myWindowData, myAllocator->GetAllocationCallbacks(),
-				myWindowData.Width, myWindowData.Height);
+				myPhysicalDevice, myDevice, myWindowData.get(),
+				myAllocator->GetAllocationCallbacks(), myWindowData->Width, myWindowData->Height);
 		else if (result != VK_SUCCESS)
 			throw std::runtime_error("failed to flip swap chain image!");
 	}
 
 	void updateUniformBuffer(uint32_t frameIndex)
 	{
-		int period = static_cast<int>(60.0f / myAnimationSpeed);
-		float t = static_cast<float>(frameIndex % period) / period;
-		float s = smootherstep(smoothstep(clamp(ramp(t < 0.5f ? t : 1 - t, 0, 0.5f), 0, 1)));
+		// int period = static_cast<int>(60.0f / myAnimationSpeed);
+		// float t = static_cast<float>(frameIndex % period) / period;
+		static auto start = std::chrono::high_resolution_clock::now();
+		auto now = std::chrono::high_resolution_clock::now();
+		constexpr float period = 5.0f;
+		float t = fmod(std::chrono::duration<float>(now - start).count(), period);
+		float s = smootherstep(
+			smoothstep(clamp(ramp(t < (0.5f * period) ? t : period - t, 0, 0.5f * period), 0, 1)));
 
 		UniformBufferObject ubo = {};
 		ubo.model[0] = {1 * s, 0, 0, 0};
@@ -1174,31 +1184,31 @@ class VulkanApplication
 
 	void submitFrame(uint32_t frameIndex)
 	{
-		ImGui_ImplVulkanH_FrameData* oldFrame = &myWindowData.Frames[myWindowData.FrameIndex];
+		ImGui_ImplVulkanH_FrameData* oldFrame = &myWindowData->Frames[myWindowData->FrameIndex];
 		VkSemaphore& imageAquiredSemaphore = oldFrame->ImageAcquiredSemaphore;
 
-		checkFlipOrPresentResult(vkAcquireNextImageKHR(myDevice, myWindowData.Swapchain, UINT64_MAX,
-													   imageAquiredSemaphore, VK_NULL_HANDLE,
-													   &myWindowData.FrameIndex));
+		checkFlipOrPresentResult(vkAcquireNextImageKHR(myDevice, myWindowData->Swapchain,
+													   UINT64_MAX, imageAquiredSemaphore,
+													   VK_NULL_HANDLE, &myWindowData->FrameIndex));
 
-		// std::cout << "FrameIndex: " << myWindowData.FrameIndex << std::endl;
+		// std::cout << "FrameIndex: " << myWindowData->FrameIndex << std::endl;
 
 		/*
 		{
 			VkAcquireNextImageInfoKHR nextImageInfo = {};
 			nextImageInfo.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR;
-			nextImageInfo.swapchain = myWindowData.Swapchain;
+			nextImageInfo.swapchain = myWindowData->Swapchain;
 			nextImageInfo.timeout = UINT64_MAX;
 			nextImageInfo.semaphore = imageAquiredSemaphore;
 			nextImageInfo.fence = VK_NULL_HANDLE;
 			nextImageInfo.deviceMask = ?;
 
 			checkFlipOrPresentResult(vkAcquireNextImage2KHR(myDevice, &nextImageInfo,
-		&myWindowData.FrameIndex));
+		&myWindowData->FrameIndex));
 		}
 		 */
 
-		ImGui_ImplVulkanH_FrameData* newFrame = &myWindowData.Frames[myWindowData.FrameIndex];
+		ImGui_ImplVulkanH_FrameData* newFrame = &myWindowData->Frames[myWindowData->FrameIndex];
 
 		// wait for previous command buffer to be submitted
 		{
@@ -1219,12 +1229,12 @@ class VulkanApplication
 		{
 			VkRenderPassBeginInfo beginInfo = {};
 			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			beginInfo.renderPass = myWindowData.RenderPass;
-			beginInfo.framebuffer = myWindowData.Framebuffer[myWindowData.FrameIndex];
-			beginInfo.renderArea.extent.width = myWindowData.Width;
-			beginInfo.renderArea.extent.height = myWindowData.Height;
+			beginInfo.renderPass = myWindowData->RenderPass;
+			beginInfo.framebuffer = myWindowData->Framebuffer[myWindowData->FrameIndex];
+			beginInfo.renderArea.extent.width = myWindowData->Width;
+			beginInfo.renderArea.extent.height = myWindowData->Height;
 			beginInfo.clearValueCount = 1;
-			beginInfo.pClearValues = &myWindowData.ClearValue;
+			beginInfo.pClearValues = &myWindowData->ClearValue;
 			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
@@ -1269,14 +1279,14 @@ class VulkanApplication
 
 	void presentFrame(uint32_t frameIndex)
 	{
-		ImGui_ImplVulkanH_FrameData* fd = &myWindowData.Frames[myWindowData.FrameIndex];
+		ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[myWindowData->FrameIndex];
 		VkPresentInfoKHR info = {};
 		info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		info.waitSemaphoreCount = 1;
 		info.pWaitSemaphores = &fd->RenderCompleteSemaphore;
 		info.swapchainCount = 1;
-		info.pSwapchains = &myWindowData.Swapchain;
-		info.pImageIndices = &myWindowData.FrameIndex;
+		info.pSwapchains = &myWindowData->Swapchain;
+		info.pImageIndices = &myWindowData->FrameIndex;
 		checkFlipOrPresentResult(vkQueuePresentKHR(myQueue, &info));
 	}
 
@@ -1284,7 +1294,7 @@ class VulkanApplication
 	{
 		CHECK_VK(vkDeviceWaitIdle(myDevice));
 
-		ImGui_ImplVulkanH_DestroyWindowData(myInstance, myDevice, &myWindowData,
+		ImGui_ImplVulkanH_DestroyWindowData(myInstance, myDevice, myWindowData.get(),
 											myAllocator->GetAllocationCallbacks());
 		ImGui_ImplVulkan_Shutdown();
 
@@ -1418,7 +1428,7 @@ class VulkanApplication
 	VkBuffer myUniformBuffer = VK_NULL_HANDLE;
 	VmaAllocation myUniformBufferMemory = VK_NULL_HANDLE;
 
-	ImGui_ImplVulkanH_WindowData myWindowData;
+	std::unique_ptr<ImGui_ImplVulkanH_WindowData> myWindowData;
 	std::vector<ImFont*> myFonts;
 
 	const std::string myResourcePath;

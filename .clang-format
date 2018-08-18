@@ -1,5 +1,4 @@
 Language: Cpp
-# BasedOnStyle:  LLVM
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: false
@@ -23,7 +22,7 @@ BraceWrapping:
   AfterClass: true
   AfterControlStatement: true
   AfterEnum: true
-  AfterExternBlock: false
+  #AfterExternBlock: false
   AfterFunction: true
   AfterNamespace: true
   AfterObjCDeclaration: false
@@ -59,7 +58,7 @@ IncludeCategories:
     Priority:        1
 IncludeIsMainRegex: '$'
 IndentCaseLabels: true
-IndentPPDirectives: AfterHash
+#IndentPPDirectives: AfterHash
 IndentWidth: 4
 IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave

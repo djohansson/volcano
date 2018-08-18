@@ -1,4 +1,3 @@
-#include "Main.h"
 #include "Resource.h"
 #include "targetver.h"
 
@@ -105,7 +104,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	vkapp_create((void*)g_hWnd, 1024, 768, "..\\..\\..\\resources\\");
+	vkapp_create((void*)g_hWnd, 1280, 720, "..\\..\\..\\resources\\");
 	ImGui_ImplWin32_Init(g_hWnd);
 	g_initialized = true;
 
@@ -193,7 +192,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 						 // todo: investigate "On Nvidia you can get Exclusive Fullscreen though, by creating a borderless window (style:0x96000000/ex:0x0) and rendering to it."
 	g_hWnd = CreateWindowW(g_szWindowClass, g_szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+		CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, hInstance, nullptr);
 
 	if (!g_hWnd)
 	{

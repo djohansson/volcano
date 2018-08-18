@@ -181,6 +181,9 @@
     <Image Include="..\..\..\resources\images\small.ico" />
     <Image Include="..\..\..\resources\images\volcano.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\.clang-format" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
