@@ -456,7 +456,7 @@ class VulkanApplication
 	{
 #if defined(VOLCANO_USE_GLFW)
 		CHECK_VK(glfwCreateWindowSurface(myInstance, reinterpret_cast<GLFWwindow*>(view), nullptr,
-										 &myWindowData->Surface));
+										 &outSurface));
 #elif defined(_WIN32)
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -1432,7 +1432,6 @@ class VulkanApplication
 	std::vector<ImFont*> myFonts;
 
 	const std::string myResourcePath;
-	float myAnimationSpeed = 0.2f;
 
 	static const Vertex ourVertices[4];
 	static const uint16_t ourIndices[6];
