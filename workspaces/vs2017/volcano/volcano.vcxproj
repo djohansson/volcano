@@ -163,15 +163,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\Core.h" />
+    <ClInclude Include="..\..\..\src\Math.h" />
     <ClInclude Include="..\..\..\src\platform\windows\Main.h" />
     <ClInclude Include="..\..\..\src\platform\windows\Resource.h" />
     <ClInclude Include="..\..\..\src\platform\windows\targetver.h" />
+    <ClInclude Include="..\..\..\src\VkUtil.h" />
     <ClInclude Include="..\..\..\src\Volcano.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\imgui\imgui_impl.cpp" />
     <ClCompile Include="..\..\..\src\imgui\platform\windows\imgui_impl_win32.cpp" />
     <ClCompile Include="..\..\..\src\platform\windows\Main.cpp" />
+    <ClCompile Include="..\..\..\src\VkUtil.cpp" />
     <ClCompile Include="..\..\..\src\Volcano.cpp" />
   </ItemGroup>
   <ItemGroup>

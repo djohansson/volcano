@@ -2,7 +2,7 @@
 #include "targetver.h"
 
 #define NOMINMAX
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 
 #include <crtdbg.h>
@@ -16,14 +16,30 @@
 #include "../../../../imgui/imgui.h"
 #include "../../../../imgui/examples/imgui_impl_win32.h"
 
+#include <iostream>
+#include <streambuf>
 
 #define MAX_LOADSTRING 100
 
+class DebugStreamBuffer : public std::streambuf
+{
+public:
+	virtual int_type overflow(int_type c = EOF)
+	{
+		if (c != EOF)
+		{
+			TCHAR buf[] = { static_cast<TCHAR>(c), '\0' };
+			OutputDebugString(buf);
+		}
+		return c;
+	}
+};
+
 // Global Variables:
-HINSTANCE g_hInst;                              // current instance
-HWND g_hWnd;									// main window
-WCHAR g_szTitle[MAX_LOADSTRING];                // The title bar text
-WCHAR g_szWindowClass[MAX_LOADSTRING];          // the main window class name
+HINSTANCE g_hInst;					   // current instance
+HWND g_hWnd;						   // main window
+WCHAR g_szTitle[MAX_LOADSTRING];	   // The title bar text
+WCHAR g_szWindowClass[MAX_LOADSTRING]; // the main window class name
 bool g_initialized = false;
 
 int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet)
@@ -34,19 +50,17 @@ int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet)
 		return TRUE;
 	}
 
-	return FALSE;//Return false - Abort,Retry,Ignore dialog *will be displayed*
+	return FALSE; // Return false - Abort,Retry,Ignore dialog *will be displayed*
 }
 
 // Forward declarations of functions included in this code module:
-ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
-LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+ATOM MyRegisterClass(HINSTANCE hInstance);
+BOOL InitInstance(HINSTANCE, int);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-	_In_opt_ HINSTANCE hPrevInstance,
-	_In_ LPWSTR    lpCmdLine,
-	_In_ int       nCmdShow)
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
@@ -54,8 +68,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
 	_CrtSetReportHook(CrtDbgHook);
 
+	DebugStreamBuffer debugStream;
+	std::streambuf* defaultCoutStream = std::cout.rdbuf(&debugStream);
+	std::streambuf* defaultCerrStream = std::cerr.rdbuf(&debugStream);
+	std::streambuf* defaultClogStream = std::clog.rdbuf(&debugStream);
+
 	int argc;
-	char **argv;
+	char** argv;
 
 	// Use the CommandLine functions to get the command line arguments.
 	// Unfortunately, Microsoft outputs
@@ -63,35 +82,41 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	// Ascii version to be compatible
 	// with the non-Windows side.  So, we have to convert the information to
 	// Ascii character strings.
-	LPWSTR *commandLineArgs = CommandLineToArgvW(GetCommandLineW(), &argc);
-	if (NULL == commandLineArgs) {
+	LPWSTR* commandLineArgs = CommandLineToArgvW(GetCommandLineW(), &argc);
+	if (NULL == commandLineArgs)
+	{
 		argc = 0;
 	}
 
-	if (argc > 0) {
-		argv = (char **)malloc(sizeof(char *) * argc);
-		if (argv == NULL) {
+	if (argc > 0)
+	{
+		argv = (char**)malloc(sizeof(char*) * argc);
+		if (argv == NULL)
+		{
 			argc = 0;
 		}
-		else {
-			for (int iii = 0; iii < argc; iii++) {
-				size_t wideCharLen = wcslen(commandLineArgs[iii]);
+		else
+		{
+			for (int i = 0; i < argc; i++)
+			{
+				size_t wideCharLen = wcslen(commandLineArgs[i]);
 				size_t numConverted = 0;
 
-				argv[iii] = (char *)malloc(sizeof(char) * (wideCharLen + 1));
-				if (argv[iii] != NULL) {
-					wcstombs_s(&numConverted, argv[iii], wideCharLen + 1, commandLineArgs[iii], wideCharLen + 1);
+				argv[i] = (char*)malloc(sizeof(char) * (wideCharLen + 1));
+				if (argv[i] != NULL)
+				{
+					wcstombs_s(&numConverted, argv[i], wideCharLen + 1, commandLineArgs[i],
+						wideCharLen + 1);
 				}
 			}
 		}
 	}
-	else {
+	else
+	{
 		argv = NULL;
 	}
 
 	// TODO: Place initialization code here.
-
-
 
 	// Initialize global strings
 	LoadStringW(hInstance, IDS_APP_TITLE, g_szTitle, MAX_LOADSTRING);
@@ -103,14 +128,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	vkapp_create((void*)g_hWnd, 1280, 720, "..\\..\\..\\resources\\");
+	vkapp_create((void*)g_hWnd, 1280, 720, "..\\..\\..\\..\\..\\resources\\");
 	ImGui_ImplWin32_Init(g_hWnd);
 	g_initialized = true;
 
 	// Free up the items we had to allocate for the command line arguments.
-	if (argc > 0 && argv != NULL) {
-		for (int iii = 0; iii < argc; iii++) {
-			if (argv[iii] != NULL) {
+	if (argc > 0 && argv != NULL)
+	{
+		for (int iii = 0; iii < argc; iii++)
+		{
+			if (argv[iii] != NULL)
+			{
 				free(argv[iii]);
 			}
 		}
@@ -125,13 +153,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	msg.wParam = 0;
 
 	// main message loop
-	bool done = false;  // flag saying when app is complete
+	bool done = false; // flag saying when app is complete
 	while (!done)
 	{
 		PeekMessage(&msg, NULL, 0, 0, PM_REMOVE);
-		if (msg.message == WM_QUIT)  // check for a quit message
+		if (msg.message == WM_QUIT) // check for a quit message
 		{
-			done = true;  // if found, quit app
+			done = true; // if found, quit app
 		}
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
 		{
@@ -144,10 +172,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	vkapp_destroy();
 
+	std::cout.rdbuf(defaultCoutStream);
+	std::cerr.rdbuf(defaultCerrStream);
+	std::clog.rdbuf(defaultClogStream);
+
 	return (int)msg.wParam;
 }
-
-
 
 //
 //  FUNCTION: MyRegisterClass()
@@ -189,9 +219,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 	g_hInst = hInstance; // Store instance handle in our global variable
 
-						 // todo: investigate "On Nvidia you can get Exclusive Fullscreen though, by creating a borderless window (style:0x96000000/ex:0x0) and rendering to it."
-	g_hWnd = CreateWindowW(g_szWindowClass, g_szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, hInstance, nullptr);
+	// todo: investigate "On Nvidia you can get Exclusive Fullscreen though, by creating a
+	// borderless window (style:0x96000000/ex:0x0) and rendering to it."
+	g_hWnd = CreateWindowW(g_szWindowClass, g_szTitle, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+		CW_USEDEFAULT, 1280, 720, nullptr, nullptr, hInstance, nullptr);
 
 	if (!g_hWnd)
 	{
@@ -245,7 +276,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// The validation callback calls MessageBox which can generate paint
 		// events - don't make more Vulkan calls if we got here from the
 		// callback
-		//if (!in_callback)
+		// if (!in_callback)
 		//	demo_run(&demo);
 		if (g_initialized)
 		{
@@ -255,14 +286,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	break;
-	case WM_GETMINMAXINFO:  // set window's minimum size
-							//((MINMAXINFO *)lParam)->ptMinTrackSize = demo.minsize;
+	case WM_GETMINMAXINFO: // set window's minimum size
+						   //((MINMAXINFO *)lParam)->ptMinTrackSize = demo.minsize;
 		break;
 	case WM_SIZE:
 		// Resize the application to the new window size, except when
 		// it was minimized. Vulkan doesn't support images or swapchains
 		// with width=0 and height=0.
-		//if (wParam != SIZE_MINIMIZED)
+		// if (wParam != SIZE_MINIMIZED)
 		//{
 		//	demo.width = lParam & 0xffff;
 		//	demo.height = (lParam & 0xffff0000) >> 16;
@@ -303,9 +334,9 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 // On MS-Windows, make this a global, so it's available to WndProc()
-//struct demo demo;
+// struct demo demo;
 //
-//static void demo_run(struct demo *demo)
+// static void demo_run(struct demo *demo)
 //{
 //	if (!demo->prepared)
 //		return;
@@ -316,4 +347,3 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 //	if (demo->frameCount != INT_MAX && demo->curFrame == demo->frameCount)
 //		PostQuitMessage(validation_error);
 //}
-
