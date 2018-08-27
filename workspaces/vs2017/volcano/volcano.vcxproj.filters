@@ -21,9 +21,6 @@
     <ClInclude Include="..\..\..\src\platform\windows\Resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\platform\windows\targetver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Volcano.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -69,5 +66,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\.clang-format" />
+    <None Include="..\..\..\resources\shaders\Shader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\..\..\resources\shaders\Shader.vert">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

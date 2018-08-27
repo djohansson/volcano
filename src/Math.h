@@ -1,20 +1,5 @@
 #pragma once
 
-struct Vec4
-{
-	union
-	{
-		struct
-		{
-			float x;
-			float y;
-			float z;
-			float w;
-		};
-		float data[4];
-	};
-};
-
 template <typename T, typename U, typename V>
 inline T clamp(T x, U lowerlimit, V upperlimit)
 {
