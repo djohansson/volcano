@@ -70,7 +70,7 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
     CFStringGetFileSystemRepresentation(CFURLCopyFileSystemPath(resourceURL, kCFURLPOSIXPathStyle), resourcePath, sizeof(resourcePath) - 1);
     strcat(resourcePath, "/resources/");
     
-    vkapp_create((__bridge void*)(self), (int)size.width, (int)size.height, resourcePath);
+    vkapp_create((__bridge void*)(self), (int)size.width, (int)size.height, resourcePath, false);
     
     // Add a tracking area in order to receive mouse events whenever the mouse is within the bounds of our view
     NSTrackingArea* trackingArea = [[NSTrackingArea alloc] initWithRect:NSZeroRect options:NSTrackingMouseMoved | NSTrackingInVisibleRect | NSTrackingActiveAlways owner:self userInfo:nil];
@@ -147,7 +147,7 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
 - (void)drawInMTKView:(nonnull MTKView*)view
 {
     ImGui_ImplOSX_NewFrame(view);
-    vkapp_draw(self->myFrameIndex++);
+    vkapp_draw();
 }
 
 @end

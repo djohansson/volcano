@@ -6,32 +6,16 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "../../src/Volcano.cpp"
-            timestampString = "555792797.991155"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1301"
-            endingLineNumber = "1301"
-            landmarkName = "vkapp_create(void* view, int width, int height, const char* resourcePath)"
-            landmarkType = "9">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
             shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "../../src/Volcano.cpp"
-            timestampString = "555792797.991856"
+            timestampString = "556302251.1607929"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "229"
             endingLineNumber = "229"
-            landmarkName = "VulkanApplication(void* view, int width, int height, const char* resourcePath)"
+            landmarkName = "createInstance()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

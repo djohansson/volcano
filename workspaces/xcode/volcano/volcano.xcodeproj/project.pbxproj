@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		538A50852135C9810007E85E /* VkUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 538A50842135C9810007E85E /* VkUtil.cpp */; };
 		538E9F1C2120959B00524466 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 538E9F1A2120959B00524466 /* Main.storyboard */; };
 		538E9F562120996E00524466 /* imgui_impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F552120996E00524466 /* imgui_impl.cpp */; };
 		538E9F582120997C00524466 /* imgui_impl_osx.mm in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F572120997C00524466 /* imgui_impl_osx.mm */; };
@@ -46,6 +47,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		538A50812135C9810007E85E /* Math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Math.h; path = ../../../../src/Math.h; sourceTree = "<group>"; };
+		538A50822135C9810007E85E /* VkUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VkUtil.h; path = ../../../../src/VkUtil.h; sourceTree = "<group>"; };
+		538A50832135C9810007E85E /* Core.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Core.h; path = ../../../../src/Core.h; sourceTree = "<group>"; };
+		538A50842135C9810007E85E /* VkUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VkUtil.cpp; path = ../../../../src/VkUtil.cpp; sourceTree = "<group>"; };
 		538E9F032120951F00524466 /* volcano.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = volcano.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		538E9F112120952000524466 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		538E9F142120952100524466 /* volcano.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = volcano.entitlements; sourceTree = "<group>"; };
@@ -102,6 +107,10 @@
 		538E9F052120951F00524466 /* volcano */ = {
 			isa = PBXGroup;
 			children = (
+				538A50832135C9810007E85E /* Core.h */,
+				538A50812135C9810007E85E /* Math.h */,
+				538A50842135C9810007E85E /* VkUtil.cpp */,
+				538A50822135C9810007E85E /* VkUtil.h */,
 				53D052B62120A51B00BAFBC2 /* Volcano.cpp */,
 				53D052B52120A51B00BAFBC2 /* Volcano.h */,
 				538E9F5C2120998A00524466 /* AppDelegate.h */,
@@ -202,6 +211,7 @@
 			files = (
 				538E9F622120998A00524466 /* ViewController.m in Sources */,
 				53D052B72120A51B00BAFBC2 /* Volcano.cpp in Sources */,
+				538A50852135C9810007E85E /* VkUtil.cpp in Sources */,
 				538E9F582120997C00524466 /* imgui_impl_osx.mm in Sources */,
 				538E9F602120998A00524466 /* Main.m in Sources */,
 				538E9F612120998A00524466 /* RenderView.mm in Sources */,
@@ -348,6 +358,7 @@
 					/Users/danjo/Work/VulkanMemoryAllocator/src,
 					/Users/danjo/Work/imgui,
 					/Users/danjo/Work/stb,
+					/Users/danjo/Work/glm,
 				);
 				INFOPLIST_FILE = volcano/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -375,6 +386,7 @@
 					/Users/danjo/Work/VulkanMemoryAllocator/src,
 					/Users/danjo/Work/imgui,
 					/Users/danjo/Work/stb,
+					/Users/danjo/Work/glm,
 				);
 				INFOPLIST_FILE = volcano/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
