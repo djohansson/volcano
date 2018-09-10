@@ -3,7 +3,7 @@
 #include "Math.h"
 #include "VkUtil.h"
 
-#include <vulkan/vulkan.h>
+#include <volk.h>
 
 #if defined(VOLCANO_USE_GLFW)
 #	define GLFW_INCLUDE_NONE
@@ -34,10 +34,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define GLM_FORCE_RADIANS
+#define GLM_FORCE_MESSAGES
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_interpolation.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
@@ -53,6 +55,34 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+
+
+// TEST
+class VkDeviceTable
+{
+	VkDevice myDevice = VK_NULL_HANDLE;
+	VolkDeviceTable myDeviceTable;
+
+public:
+
+	VkDeviceTable(VkDevice device, VolkDeviceTable deviceTable)
+		: myDevice(device)
+		, myDeviceTable(deviceTable)
+	{}
+
+	inline VkResult vkAllocateCommandBuffers(const VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers) const
+	{
+		return myDeviceTable.vkAllocateCommandBuffers(myDevice, pAllocateInfo, pCommandBuffers);
+	}
+
+	inline void vkGetDeviceQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue) const
+	{
+		myDeviceTable.vkGetDeviceQueue(myDevice, queueFamilyIndex, queueIndex, pQueue);
+	}
+
+	
+};
+// END TEST
 
 class VulkanApplication
 {
@@ -118,14 +148,6 @@ public:
 		ImGui_ImplVulkan_NewFrame();
 		ImGui::NewFrame();
 
-		/*
-		{
-			ImGui::Begin("Image");
-			ImGui::Image(ImTextureID user_texture_id, const ImVec2 &size)
-			ImGui::End();
-		}
-		 */
-
 		ImGui::ShowDemoWindow();
 
 		{
@@ -171,6 +193,8 @@ public:
 private:
 	void createInstance()
 	{
+		CHECK_VK(volkInitialize());
+
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -201,13 +225,17 @@ private:
 
 		std::vector<const char*> instanceExtensions(instanceExtensionCount);
 		for (uint32_t i = 0; i < instanceExtensionCount; i++)
+		{
 			instanceExtensions[i] = availableInstanceExtensions[i].extensionName;
+			std::cout << instanceExtensions[i] << "\n";
+		}
 
 		std::sort(instanceExtensions.begin(), instanceExtensions.end(),
 			[](const char* lhs, const char* rhs) { return strcmp(lhs, rhs) < 0; });
 
 		std::vector<const char*> requiredExtensions = {
 			// must be sorted lexicographically for std::includes to work!
+			"VK_EXT_debug_report", 
 			"VK_KHR_surface",
 #if defined(_WIN32)
 			"VK_KHR_win32_surface",
@@ -237,10 +265,12 @@ private:
 		info.pApplicationInfo = &appInfo;
 		info.enabledLayerCount = 1;
 		info.ppEnabledLayerNames = enabledLayerNames;
-		info.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
-		info.ppEnabledExtensionNames = instanceExtensions.data();
+		info.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
+		info.ppEnabledExtensionNames = requiredExtensions.data();
 
 		CHECK_VK(vkCreateInstance(&info, NULL, &myInstance));
+
+		volkLoadInstance(myInstance);
 	}
 
 	void createDebugCallback()
@@ -260,10 +290,6 @@ private:
 			return VK_FALSE;
 		});
 
-		auto vkCreateDebugReportCallbackEXT =
-			(PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(
-				myInstance, "vkCreateDebugReportCallbackEXT");
-		assert(vkCreateDebugReportCallbackEXT != nullptr);
 		CHECK_VK(vkCreateDebugReportCallbackEXT(myInstance, &debugCallbackInfo, nullptr,
 			&myDebugCallback));
 	}
@@ -369,45 +395,73 @@ private:
 		vkEnumerateDeviceExtensionProperties(myPhysicalDevice, nullptr, &deviceExtensionCount,
 			availableDeviceExtensions.data());
 
-		assert(std::find_if(availableDeviceExtensions.begin(), availableDeviceExtensions.end(),
-			[](const VkExtensionProperties& extension) {
-			return strcmp(extension.extensionName, "VK_KHR_swapchain") == 0;
-		}) != availableDeviceExtensions.end());
-
-		std::vector<const char*> deviceExtensions;
-		for (const auto& extension : availableDeviceExtensions)
+		std::vector<const char*> deviceExtensions(deviceExtensionCount);
+		for (uint32_t i = 0; i < deviceExtensionCount; i++)
 		{
 #if defined(__APPLE__)
-			if (strcmp(extension.extensionName, "VK_MVK_moltenvk") == 0 ||
-				strcmp(extension.extensionName, "VK_KHR_surface") == 0 ||
-				strcmp(extension.extensionName, "VK_MVK_macos_surface") == 0)
+			if (strcmp(availableDeviceExtensions[i].extensionName, "VK_MVK_moltenvk") == 0 ||
+				strcmp(availableDeviceExtensions[i].extensionName, "VK_KHR_surface") == 0 ||
+				strcmp(availableDeviceExtensions[i].extensionName, "VK_MVK_macos_surface") == 0)
 				continue;
 #endif
-
-			deviceExtensions.push_back(extension.extensionName);
+			deviceExtensions[i] = availableDeviceExtensions[i].extensionName;
+			std::cout << deviceExtensions[i] << "\n";
 		}
 
 		std::sort(deviceExtensions.begin(), deviceExtensions.end(),
 			[](const char* lhs, const char* rhs) { return strcmp(lhs, rhs) < 0; });
+
+		std::vector<const char*> requiredDeviceExtensions = {
+			// must be sorted lexicographically for std::includes to work!
+			"VK_KHR_swapchain"
+		};
+
+		assert(
+			std::includes(deviceExtensions.begin(), deviceExtensions.end(),
+				requiredDeviceExtensions.begin(), requiredDeviceExtensions.end(),
+				[](const char* lhs, const char* rhs) { return strcmp(lhs, rhs) < 0; }));
 
 		VkDeviceCreateInfo deviceCreateInfo = {};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 		deviceCreateInfo.queueCreateInfoCount = 1;
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-		deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-		deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
+		deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size());
+		deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
 		CHECK_VK(vkCreateDevice(myPhysicalDevice, &deviceCreateInfo, nullptr, &myDevice));
 
-		vkGetDeviceQueue(myDevice, myQueueFamilyIndex, 0, &myQueue);
+		volkLoadDeviceTable(&myDeviceTable, myDevice);
+		VkDeviceTable vk(myDevice, myDeviceTable);
+		vk.vkGetDeviceQueue(myQueueFamilyIndex, 0, &myQueue);
 	}
 
 	void createAllocator()
 	{
+		VmaVulkanFunctions functions = {};
+		functions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+		functions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+		functions.vkAllocateMemory = myDeviceTable.vkAllocateMemory;
+		functions.vkFreeMemory = myDeviceTable.vkFreeMemory;
+		functions.vkMapMemory = myDeviceTable.vkMapMemory;
+		functions.vkUnmapMemory = myDeviceTable.vkUnmapMemory;
+		functions.vkFlushMappedMemoryRanges = myDeviceTable.vkFlushMappedMemoryRanges;
+		functions.vkInvalidateMappedMemoryRanges = myDeviceTable.vkInvalidateMappedMemoryRanges;
+		functions.vkBindBufferMemory = myDeviceTable.vkBindBufferMemory;
+		functions.vkBindImageMemory = myDeviceTable.vkBindImageMemory;
+		functions.vkGetBufferMemoryRequirements = myDeviceTable.vkGetBufferMemoryRequirements;
+		functions.vkGetImageMemoryRequirements = myDeviceTable.vkGetImageMemoryRequirements;
+		functions.vkCreateBuffer = myDeviceTable.vkCreateBuffer;
+		functions.vkDestroyBuffer = myDeviceTable.vkDestroyBuffer;
+		functions.vkCreateImage = myDeviceTable.vkCreateImage;
+		functions.vkDestroyImage = myDeviceTable.vkDestroyImage;
+		functions.vkGetBufferMemoryRequirements2KHR = myDeviceTable.vkGetBufferMemoryRequirements2KHR;
+		functions.vkGetImageMemoryRequirements2KHR = myDeviceTable.vkGetImageMemoryRequirements2KHR;
+		
 		VmaAllocatorCreateInfo allocatorInfo = {};
 		allocatorInfo.physicalDevice = myPhysicalDevice;
 		allocatorInfo.device = myDevice;
+		allocatorInfo.pVulkanFunctions = &functions;
 		vmaCreateAllocator(&allocatorInfo, &myAllocator);
 	}
 
@@ -434,7 +488,7 @@ private:
 		poolInfo.maxSets = maxDescriptorCount * static_cast<uint32_t>(sizeof_array(poolSizes));
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
-		CHECK_VK(vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
+		CHECK_VK(myDeviceTable.vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
 	}
 
 	void createDepthResources(int height, int width)
@@ -483,7 +537,7 @@ private:
 		layoutInfo.pBindings = bindings.data();
 
 		CHECK_VK(
-			vkCreateDescriptorSetLayout(myDevice, &layoutInfo, nullptr, &myDescriptorSetLayout));
+			myDeviceTable.vkCreateDescriptorSetLayout(myDevice, &layoutInfo, nullptr, &myDescriptorSetLayout));
 	}
 
 	void createDescriptorSet()
@@ -495,7 +549,7 @@ private:
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = layouts;
 
-		CHECK_VK(vkAllocateDescriptorSets(myDevice, &allocInfo, &myDescriptorSet));
+		CHECK_VK(myDeviceTable.vkAllocateDescriptorSets(myDevice, &allocInfo, &myDescriptorSet));
 
 		VkDescriptorBufferInfo bufferInfo = {};
 		bufferInfo.buffer = myUniformBuffer;
@@ -523,7 +577,7 @@ private:
 		descriptorWrites[1].descriptorCount = 1;
 		descriptorWrites[1].pImageInfo = &imageInfo;
 
-		vkUpdateDescriptorSets(myDevice, static_cast<uint32_t>(descriptorWrites.size()),
+		myDeviceTable.vkUpdateDescriptorSets(myDevice, static_cast<uint32_t>(descriptorWrites.size()),
 			descriptorWrites.data(), 0, nullptr);
 	}
 
@@ -581,7 +635,7 @@ private:
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
 
-		CHECK_VK(vkCreateRenderPass(myDevice, &renderPassInfo, nullptr, &myRenderPass));
+		CHECK_VK(myDeviceTable.vkCreateRenderPass(myDevice, &renderPassInfo, nullptr, &myRenderPass));
 	}
 
 	void createGraphicsPipeline()
@@ -595,7 +649,7 @@ private:
 		vsCreateInfo.pCode = reinterpret_cast<const uint32_t*>(vsCode.data());
 
 		VkShaderModule vsModule;
-		CHECK_VK(vkCreateShaderModule(myDevice, &vsCreateInfo, nullptr, &vsModule));
+		CHECK_VK(myDeviceTable.vkCreateShaderModule(myDevice, &vsCreateInfo, nullptr, &vsModule));
 
 		VkPipelineShaderStageCreateInfo vsStageInfo = {};
 		vsStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -612,7 +666,7 @@ private:
 		fsCreateInfo.pCode = reinterpret_cast<const uint32_t*>(fsCode.data());
 
 		VkShaderModule fsModule;
-		CHECK_VK(vkCreateShaderModule(myDevice, &fsCreateInfo, nullptr, &fsModule));
+		CHECK_VK(myDeviceTable.vkCreateShaderModule(myDevice, &fsCreateInfo, nullptr, &fsModule));
 
 		VkPipelineShaderStageCreateInfo fsStageInfo = {};
 		fsStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -665,7 +719,7 @@ private:
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 		rasterizer.lineWidth = 1.0f;
 		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rasterizer.depthBiasEnable = VK_FALSE;
 		rasterizer.depthBiasConstantFactor = 0.0f;
 		rasterizer.depthBiasClamp = 0.0f;
@@ -733,7 +787,7 @@ private:
 		pipelineLayoutInfo.pushConstantRangeCount = 0;
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-		CHECK_VK(vkCreatePipelineLayout(myDevice, &pipelineLayoutInfo, nullptr, &myPipelineLayout));
+		CHECK_VK(myDeviceTable.vkCreatePipelineLayout(myDevice, &pipelineLayoutInfo, nullptr, &myPipelineLayout));
 
 		VkGraphicsPipelineCreateInfo pipelineInfo = {};
 		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -753,11 +807,11 @@ private:
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1;
 
-		CHECK_VK(vkCreateGraphicsPipelines(myDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(myDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
 			&myGraphicsPipeline));
 
-		vkDestroyShaderModule(myDevice, vsModule, nullptr);
-		vkDestroyShaderModule(myDevice, fsModule, nullptr);
+		myDeviceTable.vkDestroyShaderModule(myDevice, vsModule, nullptr);
+		myDeviceTable.vkDestroyShaderModule(myDevice, fsModule, nullptr);
 	}
 
 	VkCommandBuffer beginSingleTimeCommands()
@@ -766,7 +820,7 @@ private:
 		VkCommandBuffer commandBuffer =
 			myWindowData->Frames[myWindowData->FrameIndex].CommandBuffer;
 
-		CHECK_VK(vkResetCommandPool(myDevice, commandPool, 0));
+		CHECK_VK(myDeviceTable.vkResetCommandPool(myDevice, commandPool, 0));
 
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -784,7 +838,7 @@ private:
 		endInfo.pCommandBuffers = &commandBuffer;
 		CHECK_VK(vkEndCommandBuffer(commandBuffer));
 		CHECK_VK(vkQueueSubmit(myQueue, 1, &endInfo, VK_NULL_HANDLE));
-		CHECK_VK(vkDeviceWaitIdle(myDevice));
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
 	}
 
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
@@ -1025,7 +1079,7 @@ private:
 		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-		CHECK_VK(vkCreateImageView(myDevice, &viewInfo, nullptr, &imageView));
+		CHECK_VK(myDeviceTable.vkCreateImageView(myDevice, &viewInfo, nullptr, &imageView));
 
 		return imageView;
 	}
@@ -1050,7 +1104,7 @@ private:
 		samplerInfo.minLod = 0.0f;
 		samplerInfo.maxLod = 0.0f;
 
-		CHECK_VK(vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
+		CHECK_VK(myDeviceTable.vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
 	void initVulkan(void* window, int height, int width, VkSurfaceKHR& outSurface)
@@ -1108,8 +1162,9 @@ private:
 		presentMode =
 			ImGui_ImplVulkanH_SelectPresentMode(myPhysicalDevice, surface, &presentMode, 1);
 
-		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(
-			presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2);
+		uint32_t bufferCount = presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2;
+
+		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(bufferCount);
 
 		myWindowData->SurfaceFormat = surfaceFormat;
 		myWindowData->Surface = surface;
@@ -1124,8 +1179,49 @@ private:
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
-		ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(
-			myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
+		
+		myCommandPools.resize(myThreadCount);
+		myCommandBuffers.resize(myThreadCount);
+		for (uint32_t i = 0; i < myThreadCount; i++)
+		{
+			myCommandBuffers[i].resize(bufferCount);
+
+			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
+			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[i]));
+			assert(myCommandPools[i] != VK_NULL_HANDLE);
+
+			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+			cmdInfo.commandPool = myCommandPools[i];
+			cmdInfo.level = i == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+			cmdInfo.commandBufferCount = bufferCount;
+			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, &(myCommandBuffers[i][0])));
+		}
+
+		myFrameFences.resize(bufferCount);
+		myImageAcquiredSemaphores.resize(bufferCount);
+		myRenderCompleteSemaphores.resize(bufferCount);
+		for (uint32_t i = 0; i < bufferCount; i++)
+		{
+			VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+			fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+			CHECK_VK(vkCreateFence(myDevice, &fenceInfo, nullptr, &myFrameFences[i]));
+
+			VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myImageAcquiredSemaphores[i]));
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myRenderCompleteSemaphores[i]));
+
+			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[i];
+			fd->CommandPool = myCommandPools[0];
+			fd->CommandBuffer = myCommandBuffers[0][i];
+			fd->Fence = myFrameFences[i];
+			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[i];
+			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[i];
+		}
+		
+		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
+
 
 		// Setup Vulkan binding
 		ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -1169,16 +1265,37 @@ private:
 	{
 		static auto start = std::chrono::high_resolution_clock::now();
 		auto now = std::chrono::high_resolution_clock::now();
-		constexpr float period = 10.0f;
+		constexpr float period = 10.0;
 		float t = std::chrono::duration<float>(now - start).count();
 		float tp = fmod(t, period);
 		float s = smootherstep(
 			smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
+		glm::mat4 model = glm::rotate(
+			glm::translate(
+				glm::mat4(1),
+				glm::vec3(0, 0, -0.01f - std::numeric_limits<float>::epsilon())),
+			s * glm::radians(360.0f),
+			glm::vec3(0.0, 0.0, 1.0));
+
+		glm::mat4 view0 = glm::mat4(1);
+		glm::mat4 proj0 = glm::frustum(-1.0, 1.0, -1.0, 1.0, 0.01, 10.0);
+
+		glm::mat4 view1 = glm::lookAt(glm::vec3(1.5f, 1.5f, 1.0f), glm::vec3(0.0f, 0.0f, -0.5f), glm::vec3(0.0f, 0.0f, -1.0f));
+		glm::mat4 proj1 = glm::perspective(glm::radians(75.0f), myWindowData->Width / static_cast<float>(myWindowData->Height), 0.01f, 10.0f);
+
 		UniformBufferObject ubo = {};
-		ubo.model = glm::rotate(glm::mat4(1.0f), s * glm::radians(360.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-		ubo.proj = glm::perspective(glm::radians(45.0f), myWindowData->Width / (float)myWindowData->Height, 0.1f, 10.0f);
+		ubo.model = model;
+		ubo.view = glm::mat4(
+			lerp(view0[0], view1[0], s),
+			lerp(view0[1], view1[1], s),
+			lerp(view0[2], view1[2], s),
+			lerp(view0[3], view1[3], s));
+		ubo.proj = glm::mat4(
+			lerp(proj0[0], proj1[0], s),
+			lerp(proj0[1], proj1[1], s),
+			lerp(proj0[2], proj1[2], s),
+			lerp(proj0[3], proj1[3], s));
 		
 		void* data;
 		CHECK_VK(vmaMapMemory(myAllocator, myUniformBufferMemory, &data));
@@ -1191,7 +1308,7 @@ private:
 		ImGui_ImplVulkanH_FrameData* oldFrame = &myWindowData->Frames[myWindowData->FrameIndex];
 		VkSemaphore& imageAquiredSemaphore = oldFrame->ImageAcquiredSemaphore;
 
-		checkFlipOrPresentResult(vkAcquireNextImageKHR(myDevice, myWindowData->Swapchain,
+		checkFlipOrPresentResult(myDeviceTable.vkAcquireNextImageKHR(myDevice, myWindowData->Swapchain,
 			UINT64_MAX, imageAquiredSemaphore,
 			VK_NULL_HANDLE, &myWindowData->FrameIndex));
 		/* MGPU method from vk 1.1 spec
@@ -1204,33 +1321,69 @@ private:
 			nextImageInfo.fence = VK_NULL_HANDLE;
 			nextImageInfo.deviceMask = ?;
 
-			checkFlipOrPresentResult(vkAcquireNextImage2KHR(myDevice, &nextImageInfo,
+			checkFlipOrPresentResult(myDeviceTable.vkAcquireNextImage2KHR(myDevice, &nextImageInfo,
 		&myWindowData->FrameIndex));
 		}
 		 */
 
 		ImGui_ImplVulkanH_FrameData* newFrame = &myWindowData->Frames[myWindowData->FrameIndex];
 
+		std::array<VkClearValue, 2> clearValues = {};
+		clearValues[0] = myWindowData->ClearValue;
+		clearValues[1].depthStencil = { 1.0f, 0 };
+
 		// wait for previous command buffer to be submitted
 		{
-			CHECK_VK(vkWaitForFences(myDevice, 1, &newFrame->Fence, VK_TRUE, UINT64_MAX));
-			CHECK_VK(vkResetFences(myDevice, 1, &newFrame->Fence));
+			CHECK_VK(myDeviceTable.vkWaitForFences(myDevice, 1, &newFrame->Fence, VK_TRUE, UINT64_MAX));
+			CHECK_VK(myDeviceTable.vkResetFences(myDevice, 1, &newFrame->Fence));
 		}
 
-		// begin command buffer
+		// begin secondary command buffers
 		{
-			CHECK_VK(vkResetCommandPool(myDevice, newFrame->CommandPool, 0));
+			VkCommandBuffer& cmd = myCommandBuffers[1 /*threadIndex*/][myWindowData->FrameIndex];
+
+			VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
+			inherit.renderPass = myRenderPass;
+			inherit.framebuffer = myWindowData->Framebuffer[myWindowData->FrameIndex];
+
+			CHECK_VK(vkResetCommandBuffer(cmd, 0));
+			VkCommandBufferBeginInfo secBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+			secBeginInfo.flags =
+				VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT |
+				VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT |
+				VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+			secBeginInfo.pInheritanceInfo = &inherit;
+			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
+
+			auto drawAnimatedImage = [this](VkCommandBuffer cmd)
+			{
+				VkBuffer vertexBuffers[] = { myVertexBuffer };
+				VkDeviceSize offsets[] = { 0 };
+
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					myPipelineLayout, 0, 1, &myDescriptorSet, 0, nullptr);
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					myGraphicsPipeline);
+				vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+				vkCmdBindIndexBuffer(cmd, myIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdDrawIndexed(cmd, static_cast<uint32_t>(sizeof_array(ourIndices)), 1, 0, 0, 0);
+			};
+
+			drawAnimatedImage(cmd);
+
+			CHECK_VK(vkEndCommandBuffer(cmd));
+		}
+
+		// begin primary command buffer
+		{
+			CHECK_VK(vkResetCommandBuffer(newFrame->CommandBuffer, 0));
 			VkCommandBufferBeginInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			CHECK_VK(vkBeginCommandBuffer(newFrame->CommandBuffer, &info));
 		}
 
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0] = myWindowData->ClearValue;
-		clearValues[1].depthStencil = { 1.0f, 0 };
-
-		// draw animated image
+		// call secondary command buffers
 		{
 			VkRenderPassBeginInfo beginInfo = {};
 			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1240,18 +1393,9 @@ private:
 			beginInfo.renderArea.extent = { static_cast<uint32_t>(myWindowData->Width), static_cast<uint32_t>(myWindowData->Height) };
 			beginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 			beginInfo.pClearValues = clearValues.data();
-			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-			VkBuffer vertexBuffers[] = { myVertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
-
-			vkCmdBindDescriptorSets(newFrame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				myPipelineLayout, 0, 1, &myDescriptorSet, 0, nullptr);
-			vkCmdBindPipeline(newFrame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				myGraphicsPipeline);
-			vkCmdBindVertexBuffers(newFrame->CommandBuffer, 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(newFrame->CommandBuffer, myIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
-			vkCmdDrawIndexed(newFrame->CommandBuffer, static_cast<uint32_t>(sizeof_array(ourIndices)), 1, 0, 0, 0);
+			vkCmdExecuteCommands(newFrame->CommandBuffer, 1, &myCommandBuffers[1][myWindowData->FrameIndex]);
 
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
@@ -1306,9 +1450,28 @@ private:
 
 	void cleanup()
 	{
-		CHECK_VK(vkDeviceWaitIdle(myDevice));
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
 
-		ImGui_ImplVulkanH_DestroyWindowData(myInstance, myDevice, myWindowData.get(), nullptr);
+		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
+		{
+			assert(myCommandBuffers.size() == myImageAcquiredSemaphores.size() == myRenderCompleteSemaphores.size());
+			for (uint32_t i = 0; i < myFrameFences.size(); i++)
+			{
+				vkDestroyFence(myDevice, myFrameFences[i], nullptr);
+				vkDestroySemaphore(myDevice, myImageAcquiredSemaphores[i], nullptr);
+				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[i], nullptr);
+			}
+
+			assert(myCommandBuffers.size() == myCommandPools.size());
+			for (uint32_t i = 0; i < myCommandBuffers.size(); i++)
+			{
+				vkFreeCommandBuffers(myDevice, myCommandPools[i], static_cast<uint32_t>(myCommandBuffers[i].size()), &myCommandBuffers[i][0]);
+				vkDestroyCommandPool(myDevice, myCommandPools[i], nullptr);
+			}
+		}
+
+		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myInstance, myDevice, myWindowData.get(), nullptr);
+
 		ImGui_ImplVulkan_Shutdown();
 
 		ImGui::DestroyContext();
@@ -1317,24 +1480,21 @@ private:
 		vmaDestroyBuffer(myAllocator, myVertexBuffer, myVertexBufferMemory);
 		vmaDestroyBuffer(myAllocator, myIndexBuffer, myIndexBufferMemory);
 		vmaDestroyImage(myAllocator, myImage, myImageMemory);
-		vkDestroyImageView(myDevice, myImageView, nullptr);
-		vkDestroySampler(myDevice, mySampler, nullptr);
+		
+		myDeviceTable.vkDestroyImageView(myDevice, myImageView, nullptr);
+		myDeviceTable.vkDestroySampler(myDevice, mySampler, nullptr);
 
-		vkDestroyDescriptorSetLayout(myDevice, myDescriptorSetLayout, nullptr);
-		vkDestroyDescriptorPool(myDevice, myDescriptorPool, nullptr);
+		myDeviceTable.vkDestroyDescriptorSetLayout(myDevice, myDescriptorSetLayout, nullptr);
+		myDeviceTable.vkDestroyDescriptorPool(myDevice, myDescriptorPool, nullptr);
 
-		vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
-		vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
-		vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
+		myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
+		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
+		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
 
 		vmaDestroyAllocator(myAllocator);
 
-		vkDestroyDevice(myDevice, nullptr);
+		myDeviceTable.vkDestroyDevice(myDevice, nullptr);
 
-		auto vkDestroyDebugReportCallbackEXT =
-			(PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
-				myInstance, "vkDestroyDebugReportCallbackEXT");
-		assert(vkDestroyDebugReportCallbackEXT != nullptr);
 		vkDestroyDebugReportCallbackEXT(myInstance, myDebugCallback, nullptr);
 
 		vkDestroyInstance(myInstance, nullptr);
@@ -1388,6 +1548,7 @@ private:
 	VkDebugReportCallbackEXT myDebugCallback = VK_NULL_HANDLE;
 	VkPhysicalDevice myPhysicalDevice = VK_NULL_HANDLE;
 	VkDevice myDevice = VK_NULL_HANDLE;
+	VolkDeviceTable myDeviceTable = {};
 	VmaAllocator myAllocator = VK_NULL_HANDLE;
 	int myQueueFamilyIndex = -1;
 	VkQueue myQueue = VK_NULL_HANDLE;
@@ -1412,24 +1573,32 @@ private:
 	VmaAllocation myDepthImageMemory = VK_NULL_HANDLE;
 	VkImageView myDepthImageView = VK_NULL_HANDLE;
 
+	std::vector<VkCommandPool> myCommandPools; // count = [threadCount]
+	std::vector<std::vector<VkCommandBuffer>> myCommandBuffers; // count = [threadCount][bufferCount]
+	std::vector<VkFence> myFrameFences; // count = [bufferCount]
+	std::vector<VkSemaphore> myImageAcquiredSemaphores; // count = [bufferCount]
+	std::vector<VkSemaphore> myRenderCompleteSemaphores; // count = [bufferCount]
+
 	std::unique_ptr<ImGui_ImplVulkanH_WindowData> myWindowData;
 	std::vector<ImFont*> myFonts;
 
 	const std::string myResourcePath;
 	//bool myVerboseFlag;
+
+	static const uint32_t myThreadCount = 16;
 };
 
 const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
 {
 	{ { -1.0f, -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { 1.0f, -1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 1.0f, 0.0f } },
+	{ { -1.0f, 1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
 	{ { 1.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { -1.0f, 1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 0.0f, 1.0f } },
+	{ { 1.0f, -1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } },
 
 	{ { -1.0f, -1.0f, -1.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { 1.0f, -1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 1.0f, 0.0f } },
+	{ { -1.0f, 1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
 	{ { 1.0f, 1.0f, -1.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { -1.0f, 1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 0.0f, 1.0f } }
+	{ { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } }
 };
 
 const uint16_t VulkanApplication::ourIndices[] =
@@ -1444,6 +1613,8 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 {
 	assert(view != nullptr);
 	assert(theApp == nullptr);
+
+	_putenv("DISABLE_VK_LAYER_VALVE_steam_overlay_1=1");
 
 	if (verbose)
 	{

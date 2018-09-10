@@ -79,9 +79,9 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;VK_NO_PROTOTYPES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\volk;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;$(SolutionDir)..\..\..\..\conc11\conc11-core\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -96,6 +96,9 @@
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -105,9 +108,9 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;VK_NO_PROTOTYPES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\volk;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;$(SolutionDir)..\..\..\..\conc11\conc11-core\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -130,6 +133,9 @@
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='LLVM-Release|x64'">
     <ClCompile>
@@ -139,9 +145,9 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;VK_NO_PROTOTYPES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\include;$(SolutionDir)..\..\..\..\volk;$(SolutionDir)..\..\..\..\VulkanMemoryAllocator\src;$(SolutionDir)..\..\..\..\stb;$(SolutionDir)..\..\..\..\imgui;$(SolutionDir)..\..\..\..\glm;$(SolutionDir)..\..\..\..\conc11\conc11-core\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Wno-reserved-id-macro -Wno-undef -Wno-disabled-macro-expansion -Wno-missing-prototypes -Wno-missing-braces -Wno-zero-as-null-pointer-constant -Wno-missing-field-initializers -Wno-comma -Wno-c++98-compat-pedantic -Wno-gnu-anonymous-struct -Wno-gnu-zero-variadic-macro-arguments -Wno-nested-anon-types -Wno-sign-conversion -Wno-double-promotion -Wno-switch-enum -Wno-old-style-cast -Wno-cast-qual -Wno-cast-align -Wno-implicit-fallthrough -Wno-documentation -Wno-documentation-unknown-command</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -163,9 +169,13 @@
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Core.h" />
+    <ClInclude Include="..\..\..\src\FunctionTraits.h" />
     <ClInclude Include="..\..\..\src\Math.h" />
     <ClInclude Include="..\..\..\src\platform\windows\Main.h" />
     <ClInclude Include="..\..\..\src\platform\windows\Resource.h" />

@@ -1,12 +1,13 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <volk.h>
 
 #include <cassert>
+#include <cstdint>
 #include <string>
 #include <vector>
 
-static inline constexpr void CHECK_VK(VkResult err)
+static inline void CHECK_VK(VkResult err)
 {
 	(void)err;
 	assert(err == VK_SUCCESS);
