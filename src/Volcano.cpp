@@ -34,7 +34,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define GLM_FORCE_MESSAGES
+//#define GLM_FORCE_MESSAGES
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
@@ -79,8 +79,6 @@ public:
 	{
 		myDeviceTable.vkGetDeviceQueue(myDevice, queueFamilyIndex, queueIndex, pQueue);
 	}
-
-	
 };
 // END TEST
 
@@ -94,12 +92,6 @@ public:
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		initVulkan(view, width, height, surface);
 		initIMGUI(height, width, surface);
-		
-		transitionImageLayout(
-			myDepthImage,
-			myDepthFormat,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
@@ -1219,9 +1211,7 @@ private:
 			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[i];
 			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[i];
 		}
-		
 		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
-
 
 		// Setup Vulkan binding
 		ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -1244,6 +1234,12 @@ private:
 			endSingleTimeCommands(commandBuffer);
 			ImGui_ImplVulkan_InvalidateFontUploadObjects();
 		}
+
+		transitionImageLayout(
+			myDepthImage,
+			myDepthFormat,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
 		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
@@ -1454,7 +1450,7 @@ private:
 
 		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
 		{
-			assert(myCommandBuffers.size() == myImageAcquiredSemaphores.size() == myRenderCompleteSemaphores.size());
+			assert(myFrameFences.size() == myImageAcquiredSemaphores.size() && myFrameFences.size() == myRenderCompleteSemaphores.size());
 			for (uint32_t i = 0; i < myFrameFences.size(); i++)
 			{
 				vkDestroyFence(myDevice, myFrameFences[i], nullptr);
@@ -1480,8 +1476,10 @@ private:
 		vmaDestroyBuffer(myAllocator, myVertexBuffer, myVertexBufferMemory);
 		vmaDestroyBuffer(myAllocator, myIndexBuffer, myIndexBufferMemory);
 		vmaDestroyImage(myAllocator, myImage, myImageMemory);
+		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
 		
 		myDeviceTable.vkDestroyImageView(myDevice, myImageView, nullptr);
+		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
 		myDeviceTable.vkDestroySampler(myDevice, mySampler, nullptr);
 
 		myDeviceTable.vkDestroyDescriptorSetLayout(myDevice, myDescriptorSetLayout, nullptr);

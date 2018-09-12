@@ -7,8 +7,13 @@
         {
             "name": "(gdb) Launch",
             "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/volcano",
+			"request": "launch",
+			"windows": {
+				"program": "${workspaceFolder}/volcano-Release.exe",
+			},
+			"linux": {
+				"program": "${workspaceFolder}/volcano",
+			},
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

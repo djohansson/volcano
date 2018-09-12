@@ -3,42 +3,111 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
+		{
+			"label": "FastBuild",
+			"type": "shell",
+			"windows": {
+				"command": "${workspaceRoot}/bin/windows-x64/fbuild.exe",
+			},
+			"linux": {
+				"command": "${workspaceRoot}/bin/linux-x64/fbuild",
+			},
+			"args": ["all"],
+			"group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "owner": "cpp",
+                "fileLocation": ["relative", "${workspaceRoot}"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            }
+        },
         {
             "label": "build volcano (with clang)",
             "type": "shell",
             "command": "clang",
-            "args": [
-				"-Wall",
-				"-Wno-unused-variable",
-				"-Wno-missing-braces",
-				"-g",
-				"-Og",
-                "--std=c++17",
-				"-DVOLCANO_USE_GLFW",
-                "-I/usr/include",
-                "-I${workspaceRoot}/../VulkanSDK/1.1.82.0/x86_64/include",
-                "-I${workspaceRoot}/../VulkanMemoryAllocator/src",
-                "-I${workspaceRoot}/../stb",
-                "-I${workspaceRoot}/../imgui",
-                "-I${workspaceRoot}/../glfw/include",
-                "-L${workspaceRoot}/../VulkanSDK/1.1.82.0/x86_64/lib",
-                "-L${workspaceRoot}/../glfw/build/src",
-                "src/Volcano.cpp",
-                "src/platform/glfw/Main.cpp",
-                "src/imgui/imgui_impl.cpp",
-                "src/imgui/platform/glfw/imgui_impl_glfw.cpp",
-                "-ovolcano",
-                "-lm",
-                "-ldl",
-                "-lpthread",
-                "-lstdc++",
-                "-lX11",
-                "-lvulkan",
-                "-lglfw3",
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
+			"windows": {
+				"args": [
+					"-Wall",
+					"-Wno-unused-variable",
+					"-Wno-missing-braces",
+					"-g",
+					"-Og",
+					"--std=c++17",
+					"-DVOLCANO_USE_GLFW",
+					"-I${env:VULKAN_SDK}/include",
+					"-I${workspaceRoot}/../glm",
+					"-I${workspaceRoot}/../volk",
+					"-I${workspaceRoot}/../VulkanMemoryAllocator/src",
+					"-I${workspaceRoot}/../stb",
+					"-I${workspaceRoot}/../imgui",
+					"-I${workspaceRoot}/../glfw/include",
+					"-L${env:VULKAN_SDK}/lib",
+					"-L${workspaceRoot}/../glfw/build/src/release",
+					"src/Volcano.cpp",
+					"src/VkUtil.cpp",
+					"src/platform/glfw/Main.cpp",
+					"src/imgui/imgui_impl.cpp",
+					"src/imgui/platform/glfw/imgui_impl_glfw.cpp",
+					"-o'volcano.exe'",
+					"-lstdc++",
+					"-lvulkan-1",
+					"-lglfw3",
+					"-lgdi32",
+					"-lshell32",
+				],
+			},
+			"linux": {
+				"args": [
+					"-Wall",
+					"-Wno-unused-variable",
+					"-Wno-missing-braces",
+					"-g",
+					"-Og",
+					"--std=c++17",
+					"-DVOLCANO_USE_GLFW",
+					"-I/usr/include",
+					"-I${env:VULKAN_SDK}/include",
+					"-I${workspaceRoot}/../glm",
+					"-I${workspaceRoot}/../volk",
+					"-I${workspaceRoot}/../VulkanMemoryAllocator/src",
+					"-I${workspaceRoot}/../stb",
+					"-I${workspaceRoot}/../imgui",
+					"-I${workspaceRoot}/../glfw/include",
+					"-L${env:VULKAN_SDK}/lib",
+					"-L${workspaceRoot}/../glfw/build/src",
+					"src/Volcano.cpp",
+					"src/VkUtil.cpp",
+					"src/platform/glfw/Main.cpp",
+					"src/imgui/imgui_impl.cpp",
+					"src/imgui/platform/glfw/imgui_impl_glfw.cpp",
+					"-ovolcano",
+					"-lm",
+					"-ldl",
+					"-lpthread",
+					"-lstdc++",
+					"-lX11",
+				],
+			},
+			"problemMatcher": {
+                "owner": "cpp",
+                "fileLocation": ["relative", "${workspaceRoot}"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
             }
         }
     ]

@@ -14,7 +14,7 @@
 #include "../../Volcano.h"
 
 static bool g_resizeWanted = false;
-static unsigned int g_frameIndex = 0, g_resizeWidth = 0, g_resizeHeight = 0;
+static unsigned int g_resizeWidth = 0, g_resizeHeight = 0;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -45,7 +45,7 @@ int main(int, char**)
 		return 1;
 	}
 
-	vkapp_create(window, 1280, 720, "./resources/");
+	vkapp_create(window, 1280, 720, "./resources/", true);
 
 	// Create Framebuffer resize callback
 	int w, h;
@@ -75,7 +75,7 @@ int main(int, char**)
 
 		ImGui_ImplGlfw_NewFrame();
 
-		vkapp_draw(g_frameIndex++);
+		vkapp_draw();
 	}
 
 	ImGui_ImplGlfw_Shutdown();

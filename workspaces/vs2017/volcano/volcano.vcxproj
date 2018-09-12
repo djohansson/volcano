@@ -177,7 +177,9 @@
     <ClInclude Include="..\..\..\src\Core.h" />
     <ClInclude Include="..\..\..\src\FunctionTraits.h" />
     <ClInclude Include="..\..\..\src\Math.h" />
-    <ClInclude Include="..\..\..\src\platform\windows\Main.h" />
+    <ClInclude Include="..\..\..\src\platform\windows\ConcurrentFunctionQueue.h" />
+    <ClInclude Include="..\..\..\src\platform\windows\DebugStreamBuffer.h" />
+    <ClInclude Include="..\..\..\src\platform\windows\MessageToString.h" />
     <ClInclude Include="..\..\..\src\platform\windows\Resource.h" />
     <ClInclude Include="..\..\..\src\VkUtil.h" />
     <ClInclude Include="..\..\..\src\Volcano.h" />
@@ -186,6 +188,7 @@
     <ClCompile Include="..\..\..\src\imgui\imgui_impl.cpp" />
     <ClCompile Include="..\..\..\src\imgui\platform\windows\imgui_impl_win32.cpp" />
     <ClCompile Include="..\..\..\src\platform\windows\Main.cpp" />
+    <ClCompile Include="..\..\..\src\platform\windows\MessageToString.cpp" />
     <ClCompile Include="..\..\..\src\VkUtil.cpp" />
     <ClCompile Include="..\..\..\src\Volcano.cpp" />
   </ItemGroup>

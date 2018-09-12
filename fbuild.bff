@@ -1,0 +1,214 @@
+#if __WINDOWS__
+.VSBasePath = 'C:\Program Files (x86)\Microsoft Visual Studio\2017\Community'
+.LLVMBasePath = 'C:\Program Files\LLVM'
+.ClangPath = '$LLVMBasePath$\bin'
+.WindowsSDKBasePath = 'C:\Program Files (x86)\Windows Kits\10'
+.WindowsLibPath = '$WindowsSDKBasePath$\Lib\10.0.17134.0\um\x86'
+.WindowsIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\um'
+.WindowsUcrtLibPath = '$WindowsSDKBasePath$\Lib\10.0.17134.0\ucrt\x86'
+.WindowsUcrtIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\ucrt'
+.WindowsSharedIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\shared'
+Settings {
+	#import TMP
+	#import windir
+	.Environment = {
+		'PATH=$VSBasePath$\Common7\IDE\;$VSBasePath$\VC\bin\',
+		'TMP=$TMP$',
+		'SystemRoot=$windir$'
+	}
+	.CachePath = '$TMP$\.fbuild.cache'
+}
+.BaseIncludePaths = ' -I"$WindowsIncludePath$"'
+    + ' -I"$WindowsUcrtIncludePath$"'
+	+ ' -I"$WindowsSharedIncludePath$"'
+	+ ' -I"$VSBasePath$\VC\Tools\MSVC\14.14.26428\include"'
+.BaseLibPaths   = ' -L"$WindowsLibPath$"'
+            + ' -L"$WindowsUcrtLibPath$"'
+			+ ' -L"$VSBasePath$\VC\lib"'
+#endif //__WINDOWS__
+#if __LINUX__
+.LLVMBasePath = '/usr/bin'
+.ClangPath = '$LLVMBasePath$'
+Settings {
+	.CachePath = "/tmp/.fbuild.cache"
+}
+.BaseIncludePaths = '/usr/include'
+.BaseLibPaths = '/usr/lib'
+#endif //__LINUX__
+
+Compiler('Compiler-Clang')
+{
+#if __WINDOWS__
+	.Executable = '$ClangPath$/clang++.exe'
+#endif //__WINDOWS__
+#if __LINUX__
+	.Executable = '$ClangPath$/clang++'
+#endif //__LINUX__
+}
+
+.Clang_BaseConfig = [
+	.CompilerInfo  = 'Clang'
+#if __WINDOWS__
+	.PlatformInfo = 'Windows'
+	.Librarian = '$ClangPath$/llvm-ar.exe'
+	.Linker = '$ClangPath$/clang++.exe'
+#endif //__WINDOWS__
+#if __LINUX__
+	.PlatformInfo = 'Linux'
+	.Librarian = '$ClangPath$/llvm-ar'
+	.Linker = '$ClangPath$/clang++'
+#endif //__LINUX__
+	.Compiler = 'Compiler-Clang'
+	.BaseCompilerOptions = '-o "%2" "%1" -c -g'
+		+ .BaseIncludePaths
+#if __WINDOWS__
+		+ ' -D__WINDOWS__ -DWIN32 -D_WIN32 -D_CRT_SECURE_NO_WARNINGS'
+#endif //__WINDOWS__
+#if __LINUX__
+		+ ' -D__LINUX__ -D__linux__'
+#endif //__LINUX__
+	.CompilerOptionsC = ' -std=c11'
+	.CompilerOptionsCpp = ' -std=c++17'
+	.CompilerOptions = .BaseCompilerOptions
+		+ ' -Wall'
+#if __WINDOWS__ // to avoid errors in windows headers
+		+ ' -Wno-expansion-to-defined'
+		+ ' -Wno-nonportable-include-path'
+#endif //__WINDOWS__
+	.BaseLinkerOptions = '"%1" -o "%2" -g'
+		+ .BaseLibPaths
+	.LinkerOptions = .BaseLinkerOptions
+		+ ' -lstdc++'
+	.LibrarianOptions = 'rcs "%2" "%1"'
+	.CompilerDebugOptimizations = ' -O0'
+	.CompilerReleaseOptimizations = ' -O3'
+	.LibrarianDebugOptimizations = ''
+	.LibrarianReleaseOptimizations = ''
+	.LinkerDebugOptimizations = ''
+	.LinkerReleaseOptimizations = ''
+]
+.Clang_x64_BaseConfig = [
+	Using(.Clang_BaseConfig)
+	.ArchInfo = 'x64'
+	.CompilerOptions + ' -m64'
+]
+.Clang_x64_DebugConfig = [
+	Using(.Clang_x64_BaseConfig)
+	.Config = 'Debug'
+	.CompilerOptions + ' -DDEBUG -D_DEBUG -DPROFILING_ENABLED'
+		+ .CompilerDebugOptimizations
+	.LibrarianOptions + .LibrarianDebugOptimizations
+	.LinkerOptions + .LinkerDebugOptimizations
+]
+.Clang_x64_ReleaseConfig = [
+	Using(.Clang_x64_BaseConfig)
+	.Config = 'Release'
+	.CompilerOptions + ' -DRELEASE -DNDEBUG'
+		+ .CompilerReleaseOptimizations
+	.LibrarianOptions + .LibrarianReleaseOptimizations
+	.LinkerOptions + .LinkerReleaseOptimizations
+]
+.Clang_x64_ProfileConfig = [
+	Using(.Clang_x64_ReleaseConfig)
+	.Config = 'Profile'
+	.CompilerOptions + ' -DPROFILING_ENABLED'
+]
+
+.Clang_x64_Configs = {
+	.Clang_x64_DebugConfig, .Clang_x64_ProfileConfig, .Clang_x64_ReleaseConfig
+}
+
+
+.ProjectName = 'Volcano'
+.ProjectPath = './'
+.IntermediateFilePath = './temp'
+
+#import VULKAN_SDK
+.VulkanSDKPath = '$VULKAN_SDK$'
+
+{
+	ForEach(.Config in .Clang_x64_Configs)
+	{
+		Using(.Config)
+		.IntermediateFilePath + '/$Config$'
+		ObjectList('$ProjectName$-Lib-$Config$')
+		{
+			// todo: make separate ObjectLists depending on source file type
+			.CompilerOptions + .CompilerOptionsCpp
+				+ ' -I"$VulkanSDKPath$/include"'
+				+ ' -I"$ProjectPath$../glm"'
+				+ ' -I"$ProjectPath$../volk"'
+				+ ' -I"$ProjectPath$../VulkanMemoryAllocator/src"'
+				+ ' -I"$ProjectPath$../stb"'
+				+ ' -I"$ProjectPath$../imgui"'
+				+ ' -I"$ProjectPath$../glfw/include"'
+				+ ' -DVOLCANO_USE_GLFW'
+			// todo: include whole folder and exclude by pattern
+			//.CompilerInputPath = '$ProjectPath$'
+			.CompilerInputFiles = { '$ProjectPath$/src/Volcano.cpp',
+				'$ProjectPath$/src/VkUtil.cpp',
+				'$ProjectPath$/src/platform/glfw/Main.cpp',
+				'$ProjectPath$/src/imgui/imgui_impl.cpp',
+				'$ProjectPath$/src/imgui/platform/glfw/imgui_impl_glfw.cpp',
+			}
+			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
+		}
+	}
+}
+
+{
+	ForEach(.Config in .Clang_x64_Configs)
+	{
+		Using(.Config)
+		Executable('$ProjectName$-$Config$')
+		{
+			.Libraries = { '$ProjectName$-Lib-$Config$' }
+		#if __WINDOWS__
+			.LinkerOutput = 'volcano-$Config$.exe'
+			.LinkerOptions + ' -L"$VulkanSDKPath$/lib"'
+				+ ' -L"$ProjectPath$../glfw/build/src/release"'
+				+ ' -lgdi32'
+				+ ' -lshell32'
+				+ ' -lvulkan-1'
+				+ ' -lglfw3'
+		#endif //__WINDOWS__
+		#if __LINUX__
+			.LinkerOutput = 'volcano-$Config$'
+			.LinkerOptions + ' -L"$VulkanSDKPath$/lib"'
+				+ ' -L"$ProjectPath$../glfw/build/src/release"'
+				+ ' -lm'
+				+ ' -ldl'
+				+ ' -lpthread'
+				+ ' -lX11'
+				+ ' -lvulkan'
+				+ ' -lglfw3'
+		#endif //__LINUX__
+		}
+	}
+}
+
+Alias('release')
+{
+	.Targets = {
+		'$ProjectName$-Lib-Release', '$ProjectName$-Release'
+	}
+}
+
+Alias('profile')
+{
+	.Targets = {
+		'$ProjectName$-Lib-Profile', '$ProjectName$-Profile'
+	}
+}
+
+//Alias('debug')
+//{
+//	.Targets = {
+//		'$ProjectName$-Lib-Debug', '$ProjectName$-Debug'
+//	}
+//}
+
+Alias('all')
+{
+	.Targets = { 'release', 'profile' }
+}

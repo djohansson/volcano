@@ -5,118 +5,46 @@
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include <Windows.h>
 
-#include <crtdbg.h>
-#include <shellapi.h>
-#include <tchar.h>
-
 #include "../../Volcano.h"
+#include "../../platform/windows/MessageToString.h"
 #include "../../../../imgui/imgui.h"
 #include "../../../../imgui/examples/imgui_impl_win32.h"
 
 #include <algorithm>
-#include <condition_variable>
 #include <cstdlib>
-#include <functional>
 #include <iostream>
-#include <mutex>
 #include <stdexcept>
-#include <streambuf>
 #include <string>
-#include <thread>
 #include <vector>
 
-#include <ppl.h>
-#include <concurrent_queue.h>
+#include "DebugStreamBuffer.h"
 
-template <typename T>
-class DebugStreamBuffer : public std::basic_streambuf<T, std::char_traits<T>>
-{
-	using Super = std::basic_streambuf<T, std::char_traits<T>>;
-	using int_type = typename Super::int_type;
-	using OutputDebugStringType = typename std::conditional<std::is_same<char, T>::value, TCHAR, WCHAR>::type;
-
-public:
-	virtual int_type overflow(int_type c = EOF)
-	{
-		if (c != EOF)
-		{
-			OutputDebugStringType buf[] = { static_cast<OutputDebugStringType>(c), '\0' };
-			OutputDebugString(buf);
-		}
-		return c;
-	}
-};
-
-class ConcurrentFunctionQueue
-{
-public:
-
-	ConcurrentFunctionQueue()
-		: queue()
-	{ }
-
-	template<typename _Callable, typename... _Args>
-	void Queue(_Callable&& __f, _Args&&... __args)
-	{
-		std::function<void()> func = std::bind(std::forward<_Callable>(__f), std::forward<_Args>(__args)...);
-		queue.push(func);
-	}
-
-	void RunOne()
-	{
-		std::function<void()> func;
-		if (queue.try_pop(func))
-			func();
-	}
-
-	void RunAll()
-	{
-		std::function<void()> func;
-		while (queue.try_pop(func))
-			func();
-	}
-
-private:
-
-	concurrency::concurrent_queue<std::function<void()>> queue;
-};
 
 struct WindowData
 {
-	LPWSTR lpCmdLine = nullptr;
-	int nCmdShow = 0;
-	HINSTANCE hInstance = nullptr;
-	HWND hWnd = nullptr;
-	HWND hWndDlgModeless = nullptr;
-	HACCEL hAccelTable = nullptr;
-	MSG msg = {};
-	int width = 0;
-	int height = 0;
-	std::string resourcePath;
-	bool verbose = false;
+	enum { TitleStringSize = 128 };
+	enum Flags : uint64_t
+	{
+		Verbose = 1 << 0,
+		DrawEnable = 1 << 1,
+	};
 
-	ConcurrentFunctionQueue runOnRenderThread;
-
-	std::thread msgLoopThread;
-	std::thread renderThread;
-	std::mutex msgLoopMutex;
-	std::mutex renderMutex;
-	std::condition_variable windowInitCV;
+	WCHAR myTitle[TitleStringSize];
+	WCHAR myWindowClass[TitleStringSize];
+	LPWSTR myCmdLine = nullptr;
+	int myCmdShow = 0;
+	HINSTANCE myHInstance = nullptr;
+	HWND myHWnd = nullptr;
+	HWND myHWndDlgModeless = nullptr;
+	HACCEL myHAccelTable = nullptr;
+	MSG myMsg = {};
+	int myWidth = 0;
+	int myHeight = 0;
+	std::string myResourcePath;
+	uint64_t myFlags = DrawEnable;
 };
 
-static const unsigned int sc_staticTitleStringSize = 128;
-static WCHAR g_title[sc_staticTitleStringSize];
-static WCHAR g_windowClass[sc_staticTitleStringSize];
-static DebugStreamBuffer<char> g_debugStream;
-static DebugStreamBuffer<wchar_t> g_wDebugStream;
-static std::streambuf* g_defaultCoutStream = nullptr;
-static std::streambuf* g_defaultCerrStream = nullptr;
-static std::streambuf* g_defaultClogStream = nullptr;
-static std::wstreambuf* g_defaultWCoutStream = nullptr;
-static std::wstreambuf* g_defaultWCerrStream = nullptr;
-static std::wstreambuf* g_defaultWClogStream = nullptr;
-thread_local WindowData* t_windowData = nullptr;
-
+static thread_local WindowData* t_windowData = nullptr; // hacky way to get this into WndProc...
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -131,58 +59,40 @@ int __cdecl CrtDbgHook(int /*nReportType*/, char* /*szMsg*/, int* /*pnRet*/)
 	return FALSE;
 }
 
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
-	}
-	return (INT_PTR)FALSE;
-}
-
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	t_windowData->runOnRenderThread.Queue(ImGui_ImplWin32_WndProcHandler, hWnd, message, wParam, lParam);
-	
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		return 1;
+
+#ifdef _DEBUG
+	if (const char* msgString = GetStringFromMsg(message))
+		std::cout << "message: " << msgString << ", hWnd:" << hWnd << ", wParam: " << wParam << ", lParam: " << lParam << std::endl;
+#endif
+
+	WindowData& wnd = *t_windowData;
+
 	switch (message)
 	{
-	case WM_COMMAND:
+	case WM_ENTERSIZEMOVE:
 	{
-		int wmId = LOWORD(wParam);
-		switch (wmId)
-		{
-		case IDM_ABOUT:
-			//DialogBox(g_hInstance, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
-			break;
-		default:
-			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
+		wnd.myFlags &= ~WindowData::Flags::DrawEnable;
+	}
+	break;
+	case WM_EXITSIZEMOVE:
+	{
+		wnd.myFlags |= WindowData::Flags::DrawEnable;
 	}
 	break;
 	case WM_PAINT:
 	{
-		if (!IsIconic(hWnd) && vkapp_is_initialized())
+		if ((wnd.myFlags & WindowData::DrawEnable) && !IsIconic(hWnd) && vkapp_is_initialized())
 		{
-			t_windowData->runOnRenderThread.RunAll();
 			ImGui_ImplWin32_NewFrame();
 			vkapp_draw();
 		}
 	}
 	break;
-	case WM_GETMINMAXINFO: // set window's minimum size
+	case WM_GETMINMAXINFO:
 	{
 		reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = { 320, 240 };
 	}
@@ -190,34 +100,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_SIZE:
 	{
 		if (!IsIconic(hWnd) && vkapp_is_initialized())
-			t_windowData->runOnRenderThread.Queue(vkapp_resize, LOWORD(lParam), HIWORD(lParam));
+			vkapp_resize(LOWORD(lParam), HIWORD(lParam));
 	}
 	break;
 	case WM_SYSCOMMAND:
 	{
-		if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
-			return 0;
+		if ((wParam & 0xfff0) != SC_KEYMENU) // Disable ALT application menu
+			return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	break;
 	case WM_DESTROY:
 	{
+		ImGui_ImplWin32_Shutdown();
+		vkapp_destroy();
 		PostQuitMessage(0);
 	}
 	break;
 	case WM_CLOSE:
 	{
-		if (MessageBox(hWnd, L"Really quit?", L"My application", MB_OKCANCEL) == IDOK)
-			DestroyWindow(hWnd);
-	}
-	break;
-	case WM_EXITSIZEMOVE:
-	{
-		//PostMessage(hWnd, WM_RESHAPE, 0, 0);
+		DestroyWindow(hWnd);
 	}
 	break;
 	case WM_ACTIVATE:
+	case WM_ACTIVATEAPP:
 	{
-		//PostMessage(hWnd, WM_ACTIVE, wParam, lParam);
+		switch (wParam)
+		{
+		case 0: // FALSE or WM_INACTIVE
+			break;
+		case 1: // TRUE or WM_ACTIVE or WM_CLICKACTIVE
+		default:
+			break;
+		}
 	}
 	break;
 	default:
@@ -225,27 +139,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 
 	return 0;
-}
-
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
-	WNDCLASSEXW wcex;
-
-	wcex.cbSize = sizeof(WNDCLASSEX);
-
-	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = WndProc;
-	wcex.cbClsExtra = 0;
-	wcex.cbWndExtra = 0;
-	wcex.hInstance = hInstance;
-	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_VOLCANO));
-	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_VOLCANO);
-	wcex.lpszClassName = g_windowClass;
-	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
-	return RegisterClassExW(&wcex);
 }
 
 static char* getCmdOption(char** begin, char** end, const std::string& option)
@@ -264,12 +157,10 @@ static bool cmdOptionExists(char** begin, char** end, const std::string& option)
 
 void MessageLoop(WindowData* data)
 {
-	std::unique_lock<std::mutex> lck(data->msgLoopMutex);
-
-	HWND& hWnd = data->hWnd;
-	HWND& hWndDlgModeless = data->hWndDlgModeless;
-	HACCEL& hAccelTable = data->hAccelTable;
-	MSG& msg = data->msg;
+	HWND& hWnd = data->myHWnd;
+	HWND& hWndDlgModeless = data->myHWndDlgModeless;
+	HACCEL& hAccelTable = data->myHAccelTable;
+	MSG& msg = data->myMsg;
 
 	while (GetMessage(&msg, NULL, 0, 0) > 0)
 	{
@@ -299,46 +190,65 @@ void InitializeDebug()
 
 void InitializeAndRunMessageLoop(WindowData* data)
 {
-	t_windowData = data;
-
-	LPWSTR& lpCmdLine = data->lpCmdLine;
-	int& nCmdShow = data->nCmdShow;
-	HINSTANCE& hInstance = data->hInstance;
-	HWND& hWnd = data->hWnd;
-	HACCEL& hAccelTable = data->hAccelTable;
-	int& width = data->width;
-	int& height = data->height;
-	std::string& resourcePath = data->resourcePath;
-	bool& verbose = data->verbose;
+	LPWSTR& lpCmdLine = data->myCmdLine;
+	HINSTANCE& hInstance = data->myHInstance;
+	HWND& hWnd = data->myHWnd;
+	HACCEL& hAccelTable = data->myHAccelTable;
+	int& width = data->myWidth;
+	int& height = data->myHeight;
+	std::string& resourcePath = data->myResourcePath;
+	auto flags = data->myFlags;
 	
-	int argc = 0;
-	LPWSTR* commandLineArgs = CommandLineToArgvW(lpCmdLine, &argc);
-	assert(commandLineArgs != nullptr);
-	
-	char** argv = new char*[argc];
-	for (int i = 0; i < argc; i++)
+	// parse commandline options
 	{
-		size_t wideCharLen = wcslen(commandLineArgs[i]);
-		size_t numConverted = 0;
-		argv[i] = new char[wideCharLen + 1];
-		wcstombs_s(&numConverted, argv[i], wideCharLen + 1, commandLineArgs[i], wideCharLen + 1);
+		int argc = 0;
+		LPWSTR* commandLineArgs = CommandLineToArgvW(lpCmdLine, &argc);
+		assert(commandLineArgs != nullptr);
+
+		char** argv = new char*[argc];
+		for (int i = 0; i < argc; i++)
+		{
+			size_t wideCharLen = wcslen(commandLineArgs[i]);
+			size_t numConverted = 0;
+			argv[i] = new char[wideCharLen + 1];
+			wcstombs_s(&numConverted, argv[i], wideCharLen + 1, commandLineArgs[i], wideCharLen + 1);
+		}
+		LocalFree(commandLineArgs);
+
+		flags |= cmdOptionExists(argv, argv + argc, "-v") ? WindowData::Verbose : 0;
+
+		char* widthStr = getCmdOption(argv, argv + argc, "-w");
+		char* heightStr = getCmdOption(argv, argv + argc, "-h");
+
+		width = widthStr ? atoi(widthStr) : 1920;
+		height = heightStr ? atoi(heightStr) : 1080;
+		resourcePath = getCmdOption(argv, argv + argc, "-r");
+
+		for (int i = 0; i < argc; i++)
+			delete[] argv[i];
+
+		delete[] argv;
 	}
-	LocalFree(commandLineArgs);
-
-	verbose = cmdOptionExists(argv, argv + argc, "-v");
-
-	char* widthStr = getCmdOption(argv, argv + argc, "-w");
-	char* heightStr = getCmdOption(argv, argv + argc, "-h");
-
-	width = widthStr ? atoi(widthStr) : 1920;
-	height = heightStr ? atoi(heightStr) : 1080;
-	resourcePath = getCmdOption(argv, argv + argc, "-r");
 
 	// Initialize global strings
-	LoadStringW(hInstance, IDS_APP_TITLE, g_title, sc_staticTitleStringSize);
-	LoadStringW(hInstance, IDC_VOLCANO, g_windowClass, sc_staticTitleStringSize);
+	LoadStringW(hInstance, IDS_APP_TITLE, data->myTitle, WindowData::TitleStringSize);
+	LoadStringW(hInstance, IDC_VOLCANO, data->myWindowClass, WindowData::TitleStringSize);
 
-	if (!MyRegisterClass(hInstance))
+	WNDCLASSEXW wcex;
+	wcex.cbSize = sizeof(WNDCLASSEX);
+	wcex.style = CS_HREDRAW | CS_VREDRAW | CS_PARENTDC;
+	wcex.lpfnWndProc = WndProc;
+	wcex.cbClsExtra = 0;
+	wcex.cbWndExtra = 0;
+	wcex.hInstance = hInstance;
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_VOLCANO));
+	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_VOLCANO);
+	wcex.lpszClassName = data->myWindowClass;
+	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+
+	if (!RegisterClassExW(&wcex))
 		throw std::runtime_error("failed to register window!");
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_VOLCANO));
@@ -346,68 +256,20 @@ void InitializeAndRunMessageLoop(WindowData* data)
 	// todo: investigate "On Nvidia you can get Exclusive Fullscreen though, by creating a
 	// borderless window (style:0x96000000/ex:0x0) and rendering to it."
 	RECT wr = { 0, 0, width, height };
-	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, TRUE);
-	hWnd = CreateWindow(g_windowClass, g_title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+	hWnd = CreateWindowExW(0, data->myWindowClass, data->myTitle, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
 		CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
 		throw std::runtime_error("failed to initialize window!");
 
-	ShowWindow(hWnd, nCmdShow);
+	ShowWindow(hWnd, data->myCmdShow);
 
-	for (int i = 0; i < argc; i++)
-		delete[] argv[i];
-
-	delete[] argv;
-
-	data->windowInitCV.notify_all();
-
-	// TEMP
-	vkapp_create((void*)hWnd, width, height, resourcePath.c_str(), verbose);
+	vkapp_create((void*)hWnd, width, height, resourcePath.c_str(), flags & WindowData::Verbose);
 	ImGui_ImplWin32_Init(hWnd);
-	// TEMP
 
 	MessageLoop(data);
-
-	// TEMP
-	ImGui_ImplWin32_Shutdown();
-	vkapp_destroy();
-	// TEMP
-
-	t_windowData = nullptr;
 }
-
-//void InitializeAndRunRenderThread(WindowData* data)
-//{
-//	t_windowData = data;
-//
-//	std::unique_lock<std::mutex> lock(data->renderMutex);
-//	data->windowInitCV.wait(lock);
-//
-//	const HWND& hWnd = data->hWnd;
-//	const int width = data->width;
-//	const int height = data->height;
-//	const std::string& resourcePath = data->resourcePath;
-//	const bool verbose = data->verbose;
-//
-//	vkapp_create((void*)hWnd, width, height, resourcePath.c_str(), verbose);
-//	ImGui_ImplWin32_Init(hWnd);
-//
-//	while (true)
-//	{
-//		if (!IsIconic(hWnd) && vkapp_is_initialized())
-//		{
-//			t_windowData->runOnRenderThread.RunAll();
-//			ImGui_ImplWin32_NewFrame();
-//			vkapp_draw();
-//		}
-//	}
-//
-//	ImGui_ImplWin32_Shutdown();
-//	vkapp_destroy();
-//
-//	t_windowData = nullptr;
-//}
 
 void CleanupDebug()
 {
@@ -425,17 +287,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstan
 	InitializeDebug();
 
 	WindowData windowData = {};
-	windowData.lpCmdLine = lpCmdLine;
-	windowData.nCmdShow = nCmdShow;
-	windowData.hInstance = hInstance;
+	windowData.myCmdLine = lpCmdLine;
+	windowData.myCmdShow = nCmdShow;
+	windowData.myHInstance = hInstance;
+
+	t_windowData = &windowData;
 
 	try
 	{
-		windowData.msgLoopThread = std::thread(InitializeAndRunMessageLoop, &windowData);
-		//windowData.renderThread = std::thread(InitializeAndRunRenderThread, &windowData);
-
-		windowData.msgLoopThread.join();
-		//windowData.renderThread.join();
+		InitializeAndRunMessageLoop(&windowData);
 	}
 	catch (const std::runtime_error& e)
 	{
@@ -447,20 +307,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstan
 
 		std::wcout << wStr << std::endl;
 
-		if (windowData.hWnd)
-			MessageBox(windowData.hWnd, wStr.c_str(), L"Failure", MB_OKCANCEL);
+		if (windowData.myHWnd)
+			MessageBox(windowData.myHWnd, wStr.c_str(), L"Failure", MB_OKCANCEL);
 
-		windowData.msg.wParam = static_cast<WPARAM>(EXIT_FAILURE);
+		windowData.myMsg.wParam = static_cast<WPARAM>(EXIT_FAILURE);
 	}
 	catch (...)
 	{
-		if (windowData.hWnd)
-			MessageBox(windowData.hWnd, L"Unknown exception", L"Failure", MB_OKCANCEL);
+		if (windowData.myHWnd)
+			MessageBox(windowData.myHWnd, L"Unknown exception", L"Failure", MB_OKCANCEL);
 
-		windowData.msg.wParam = static_cast<WPARAM>(EXIT_FAILURE);
+		windowData.myMsg.wParam = static_cast<WPARAM>(EXIT_FAILURE);
 	}
+
+	t_windowData = nullptr;
 
 	CleanupDebug();
 
-	return static_cast<int>(windowData.msg.wParam);
+	return static_cast<int>(windowData.myMsg.wParam);
 }
