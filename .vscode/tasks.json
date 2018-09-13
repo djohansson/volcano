@@ -16,10 +16,10 @@
 				"command": "${workspaceRoot}/bin/osx-x64/fbuild",
 			},
 			"args": [
-				{
-					"value": "-cache -cacheverbose -summary all",
-					"quoting": "weak"
-				}
+				"-cache",
+				"-cacheverbose",
+				"-summary",
+				"all"
 			],
 			"group": {
                 "kind": "build",
@@ -39,7 +39,7 @@
             }
 		},
 		{
-			"label": "FastBuild (Cache, Clean)",
+			"label": "FastBuild (Clean, Cache)",
 			"type": "shell",
 			"windows": {
 				"command": "${workspaceRoot}/bin/windows-x64/fbuild.exe",
@@ -51,10 +51,11 @@
 				"command": "${workspaceRoot}/bin/osx-x64/fbuild",
 			},
 			"args": [
-				{
-					"value": "-cache -cacheverbose -clean -summary all",
-					"quoting": "weak"
-				}
+				"-clean",
+				"-cache",
+				"-cacheverbose",
+				"-summary",
+				"all"
 			],
 			"group": "build",
             "problemMatcher": {

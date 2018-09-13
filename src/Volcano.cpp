@@ -9,7 +9,9 @@
 #	define GLFW_INCLUDE_NONE
 #	define GLFW_INCLUDE_VULKAN
 #	include <GLFW/glfw3.h>
-#elif defined(_WIN32)
+#endif
+
+#if defined(_WIN32)
 #	define NOMINMAX
 #	include <wtypes.h>
 #	include <vulkan/vulkan_win32.h>
@@ -215,6 +217,8 @@ private:
 			"VK_KHR_xlib_surface",
 #	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 			"VK_KHR_wayland_surface",
+#	else // default to xcb
+			"VK_KHR_xcb_surface",
 #	endif
 #endif
 		};
@@ -1587,7 +1591,8 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 	assert(view != nullptr);
 	assert(theApp == nullptr);
 
-	_putenv("DISABLE_VK_LAYER_VALVE_steam_overlay_1=1");
+	static const char* DISABLE_VK_LAYER_VALVE_steam_overlay_1 = "DISABLE_VK_LAYER_VALVE_steam_overlay_1=1";
+	putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
 
 	if (verbose)
 	{

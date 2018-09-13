@@ -28,8 +28,8 @@ Settings {
 Settings {
 	.CachePath = "/tmp/.fbuild.cache"
 }
-.BaseIncludePaths = '/usr/include'
-.BaseLibPaths = '/usr/lib'
+.BaseIncludePaths = ' -I/usr/include'
+.BaseLibPaths = ' -L/usr/lib'
 #endif //__LINUX__
 
 Compiler('Compiler-Clang')
@@ -67,10 +67,6 @@ Compiler('Compiler-Clang')
 	.CompilerOptionsCpp = ' -std=c++17'
 	.CompilerOptions = .BaseCompilerOptions
 		+ ' -Wall'
-#if __WINDOWS__ // to avoid errors in windows headers
-		+ ' -Wno-expansion-to-defined'
-		+ ' -Wno-nonportable-include-path'
-#endif //__WINDOWS__
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
 	.LinkerOptions = .BaseLinkerOptions
@@ -122,26 +118,38 @@ Compiler('Compiler-Clang')
 .ProjectPath = './'
 .IntermediateFilePath = './temp'
 
+#if __WINDOWS__
 #import VULKAN_SDK
 .VulkanSDKPath = '$VULKAN_SDK$'
+#endif //__WINDOWS__
+#if __LINUX__
+.VulkanSDKPath = '$ProjectPath$../VulkanSDK/1.1.82.0/x86_64'
+#endif //__LINUX__
 
 {
 	ForEach(.Config in .Clang_x64_Configs)
 	{
 		Using(.Config)
 		.IntermediateFilePath + '/$Config$'
+		.CompilerOptions + .CompilerOptionsCpp
+				+ ' -I$VulkanSDKPath$/include'
+				+ ' -I$ProjectPath$../glm'
+				+ ' -I$ProjectPath$../volk'
+				+ ' -I$ProjectPath$../VulkanMemoryAllocator/src'
+				+ ' -I$ProjectPath$../stb'
+				+ ' -I$ProjectPath$../imgui'
+				+ ' -I$ProjectPath$../glfw/include'
+				+ ' -DVOLCANO_USE_GLFW'
+#if __WINDOWS__ // to avoid errors in windows headers
+				+ ' -Wno-expansion-to-defined'
+				+ ' -Wno-nonportable-include-path'
+#endif //__WINDOWS__
+#if __LINUX__
+				+ ' -Wno-unused-variable'
+#endif //__LINUX__
 		ObjectList('$ProjectName$-Lib-$Config$')
 		{
 			// todo: make separate ObjectLists depending on source file type
-			.CompilerOptions + .CompilerOptionsCpp
-				+ ' -I"$VulkanSDKPath$/include"'
-				+ ' -I"$ProjectPath$../glm"'
-				+ ' -I"$ProjectPath$../volk"'
-				+ ' -I"$ProjectPath$../VulkanMemoryAllocator/src"'
-				+ ' -I"$ProjectPath$../stb"'
-				+ ' -I"$ProjectPath$../imgui"'
-				+ ' -I"$ProjectPath$../glfw/include"'
-				+ ' -DVOLCANO_USE_GLFW'
 			// todo: include whole folder and exclude by pattern
 			//.CompilerInputPath = '$ProjectPath$'
 			.CompilerInputFiles = { '$ProjectPath$/src/Volcano.cpp',
@@ -152,13 +160,13 @@ Compiler('Compiler-Clang')
 			}
 			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
 		}
-		Executable('$ProjectName$-$Config$')
+		Executable('$ProjectName$-Exe-$Config$')
 		{
 			.Libraries = { '$ProjectName$-Lib-$Config$' }
 		#if __WINDOWS__
 			.LinkerOutput = 'volcano-$Config$.exe'
-			.LinkerOptions + ' -L"$VulkanSDKPath$/lib"'
-				+ ' -L"$ProjectPath$../glfw/build/src/release"'
+			.LinkerOptions + ' -L$VulkanSDKPath$/lib'
+				+ ' -L$ProjectPath$../glfw/build/src/release'
 				+ ' -lgdi32'
 				+ ' -lshell32'
 				+ ' -lvulkan-1'
@@ -166,8 +174,8 @@ Compiler('Compiler-Clang')
 		#endif //__WINDOWS__
 		#if __LINUX__
 			.LinkerOutput = 'volcano-$Config$'
-			.LinkerOptions + ' -L"$VulkanSDKPath$/lib"'
-				+ ' -L"$ProjectPath$../glfw/build/src/release"'
+			.LinkerOptions + ' -L$VulkanSDKPath$/lib'
+				+ ' -L$ProjectPath$../glfw/build/src'
 				+ ' -lm'
 				+ ' -ldl'
 				+ ' -lpthread'
