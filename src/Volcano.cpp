@@ -57,31 +57,6 @@
 #include <vector>
 
 
-// TEST
-class VkDeviceTable
-{
-	VkDevice myDevice = VK_NULL_HANDLE;
-	VolkDeviceTable myDeviceTable;
-
-public:
-
-	VkDeviceTable(VkDevice device, VolkDeviceTable deviceTable)
-		: myDevice(device)
-		, myDeviceTable(deviceTable)
-	{}
-
-	inline VkResult vkAllocateCommandBuffers(const VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers) const
-	{
-		return myDeviceTable.vkAllocateCommandBuffers(myDevice, pAllocateInfo, pCommandBuffers);
-	}
-
-	inline void vkGetDeviceQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue) const
-	{
-		myDeviceTable.vkGetDeviceQueue(myDevice, queueFamilyIndex, queueIndex, pQueue);
-	}
-};
-// END TEST
-
 class VulkanApplication
 {
 public:

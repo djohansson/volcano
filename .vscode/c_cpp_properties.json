@@ -1,35 +1,77 @@
 {
     "configurations": [
         {
-            "name": "Linux",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include",
-                "${workspaceRoot}/../VulkanSDK/1.1.82.0/x86_64/include",
-                "${workspaceRoot}/../VulkanMemoryAllocator/src",
-                "${workspaceRoot}/../stb",
-                "${workspaceRoot}/../imgui",
-                "${workspaceRoot}/../glfw/include"
-            ],
-            "defines": [
-            ],
-            "compilerPath": "/usr/bin/clang",
-            "cStandard": "c11",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "${workspaceFolder}/**",
-                    "/usr/include",
-                    "${workspaceRoot}/../VulkanSDK/1.1.82.0/x86_64/include",
-                    "${workspaceRoot}/../VulkanMemoryAllocator/src",
-                    "${workspaceRoot}/../stb",
-                    "${workspaceRoot}/../imgui",
-                    "${workspaceRoot}/../glfw/include"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            }
+			"name": "Volcano Intellisense settings",
+			"windows": {
+				"compilerPath": "C:/Program Files/LLVM/bin/clang.exe",
+				"cStandard": "c11",
+				"cppStandard": "c++17",
+				"intelliSenseMode": "clang-x64",
+				"includePath": [
+					"${workspaceFolder}/**",
+					"${env:VULKAN_SDK}/include",
+					"${workspaceRoot}/../glm",
+					"${workspaceRoot}/../volk",
+					"${workspaceRoot}/../VulkanMemoryAllocator/src",
+					"${workspaceRoot}/../stb",
+					"${workspaceRoot}/../imgui",
+					"${workspaceRoot}/../glfw/include"
+				],
+				"defines": [
+					"-D__WINDOWS__ -DWIN32 -D_WIN32",
+					"-D_CRT_SECURE_NO_WARNINGS",
+					"-DVOLCANO_USE_GLFW"
+				],
+				"browse": {
+					"path": [
+						"${workspaceFolder}/**",
+						"${env:VULKAN_SDK}/include",
+						"${workspaceRoot}/../glm",
+						"${workspaceRoot}/../volk",
+						"${workspaceRoot}/../VulkanMemoryAllocator/src",
+						"${workspaceRoot}/../stb",
+						"${workspaceRoot}/../imgui",
+						"${workspaceRoot}/../glfw/include"
+					],	
+					"limitSymbolsToIncludedHeaders": true,
+					"databaseFilename": ""
+				}
+			},
+			"linux": {
+				"compilerPath": "/usr/bin/clang",
+				"cStandard": "c11",
+				"cppStandard": "c++17",
+				"intelliSenseMode": "clang-x64",
+				"includePath": [
+					"/usr/include",
+					"${workspaceFolder}/**",
+					"${env:VULKAN_SDK}/include",
+					"${workspaceRoot}/../glm",
+					"${workspaceRoot}/../volk",
+					"${workspaceRoot}/../VulkanMemoryAllocator/src",
+					"${workspaceRoot}/../stb",
+					"${workspaceRoot}/../imgui",
+					"${workspaceRoot}/../glfw/include"
+				],
+				"defines": [
+					"-D__LINUX__ -D__linux__"
+				],
+				"browse": {
+					"path": [
+						"/usr/include",
+						"${workspaceFolder}/**",
+						"${env:VULKAN_SDK}/include",
+						"${workspaceRoot}/../glm",
+						"${workspaceRoot}/../volk",
+						"${workspaceRoot}/../VulkanMemoryAllocator/src",
+						"${workspaceRoot}/../stb",
+						"${workspaceRoot}/../imgui",
+						"${workspaceRoot}/../glfw/include"
+					],	
+					"limitSymbolsToIncludedHeaders": true,
+					"databaseFilename": ""
+				}
+			}
         }
     ],
     "version": 4
