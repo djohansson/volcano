@@ -8,7 +8,22 @@
 		"files.associations": {
 			"assert.h": "c",
 			"vk_sdk_platform.h": "c",
-			"cmath": "cpp"
+			"cmath": "cpp",
+			"array": "cpp",
+			"xiosbase": "cpp",
+			"chrono": "cpp",
+			"xhash": "cpp",
+			"xutility": "cpp",
+			"initializer_list": "cpp",
+			"list": "cpp",
+			"vector": "cpp",
+			"xstring": "cpp",
+			"istream": "cpp",
+			"memory": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp",
+			"xlocnum": "cpp"
 		},
 		"workbench.startupEditor": "newUntitledFile",
     	"editor.detectIndentation": false,

@@ -143,6 +143,7 @@ Compiler('Compiler-Clang')
 #if __WINDOWS__ // to avoid errors in windows headers
 				+ ' -Wno-expansion-to-defined'
 				+ ' -Wno-nonportable-include-path'
+				+ ' -Wno-deprecated-declarations'
 #endif //__WINDOWS__
 #if __LINUX__
 				+ ' -Wno-unused-variable'
@@ -160,7 +161,7 @@ Compiler('Compiler-Clang')
 			}
 			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
 		}
-		Executable('$ProjectName$-Exe-$Config$')
+		Executable('$ProjectName$-$Config$')
 		{
 			.Libraries = { '$ProjectName$-Lib-$Config$' }
 		#if __WINDOWS__
