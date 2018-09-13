@@ -37,7 +37,7 @@
                     "message": 5
                 }
             }
-		}
+		},
 		{
 			"label": "FastBuild (Cache, Clean)",
 			"type": "shell",
@@ -69,6 +69,6 @@
                     "message": 5
                 }
             }
-        },
+        }
     ]
 }
