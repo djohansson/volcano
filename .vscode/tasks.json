@@ -12,6 +12,9 @@
 			"linux": {
 				"command": "${workspaceRoot}/bin/linux-x64/fbuild",
 			},
+			"osx": {
+				"command": "${workspaceRoot}/bin/osx-x64/fbuild",
+			},
 			"args": [
 				{
 					"value": "-cache -cacheverbose -summary all",
@@ -43,6 +46,9 @@
 			},
 			"linux": {
 				"command": "${workspaceRoot}/bin/linux-x64/fbuild",
+			},
+			"osx": {
+				"command": "${workspaceRoot}/bin/osx-x64/fbuild",
 			},
 			"args": [
 				{
