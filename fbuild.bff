@@ -1,5 +1,4 @@
 #if __WINDOWS__
-//.VSBasePath = 'C:\Program Files (x86)\Microsoft Visual Studio\2017\Community'
 .LLVMBasePath = 'C:\Program Files\LLVM'
 .ClangPath = '$LLVMBasePath$\bin'
 .WindowsSDKBasePath = 'C:\Program Files (x86)\Windows Kits\10'
@@ -12,7 +11,6 @@ Settings {
 	#import TMP
 	#import windir
 	.Environment = {
-		//'PATH=$VSBasePath$\Common7\IDE\;$VSBasePath$\VC\bin\',
 		'TMP=$TMP$',
 		'SystemRoot=$windir$'
 	}
@@ -21,10 +19,8 @@ Settings {
 .BaseIncludePaths = ' -I"$WindowsIncludePath$"'
     + ' -I"$WindowsUcrtIncludePath$"'
 	+ ' -I"$WindowsSharedIncludePath$"'
-	//+ ' -I"$VSBasePath$\VC\Tools\MSVC\14.14.26428\include"'
-.BaseLibPaths   = ' -L"$WindowsLibPath$"'
-            + ' -L"$WindowsUcrtLibPath$"'
-			//+ ' -L"$VSBasePath$\VC\lib"'
+.BaseLibPaths = ' -L"$WindowsLibPath$"'
+    + ' -L"$WindowsUcrtLibPath$"'
 #endif //__WINDOWS__
 #if __LINUX__
 .LLVMBasePath = '/usr/bin'

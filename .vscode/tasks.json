@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "tasks": [
 		{
-			"label": "FastBuild",
+			"label": "FastBuild (Cache)",
 			"type": "shell",
 			"windows": {
 				"command": "${workspaceRoot}/bin/windows-x64/fbuild.exe",
@@ -12,7 +12,12 @@
 			"linux": {
 				"command": "${workspaceRoot}/bin/linux-x64/fbuild",
 			},
-			"args": ["all"],
+			"args": [
+				{
+					"value": "-cache -cacheverbose -summary all",
+					"quoting": "weak"
+				}
+			],
 			"group": {
                 "kind": "build",
                 "isDefault": true
@@ -29,75 +34,24 @@
                     "message": 5
                 }
             }
-        },
-        {
-            "label": "build volcano (with clang)",
-            "type": "shell",
-            "command": "clang",
+		}
+		{
+			"label": "FastBuild (Cache, Clean)",
+			"type": "shell",
 			"windows": {
-				"args": [
-					"-Wall",
-					"-Wno-unused-variable",
-					"-Wno-missing-braces",
-					"-g",
-					"-Og",
-					"--std=c++17",
-					"-DVOLCANO_USE_GLFW",
-					"-I${env:VULKAN_SDK}/include",
-					"-I${workspaceRoot}/../glm",
-					"-I${workspaceRoot}/../volk",
-					"-I${workspaceRoot}/../VulkanMemoryAllocator/src",
-					"-I${workspaceRoot}/../stb",
-					"-I${workspaceRoot}/../imgui",
-					"-I${workspaceRoot}/../glfw/include",
-					"-L${env:VULKAN_SDK}/lib",
-					"-L${workspaceRoot}/../glfw/build/src/release",
-					"src/Volcano.cpp",
-					"src/VkUtil.cpp",
-					"src/platform/glfw/Main.cpp",
-					"src/imgui/imgui_impl.cpp",
-					"src/imgui/platform/glfw/imgui_impl_glfw.cpp",
-					"-o'volcano.exe'",
-					"-lstdc++",
-					"-lvulkan-1",
-					"-lglfw3",
-					"-lgdi32",
-					"-lshell32",
-				],
+				"command": "${workspaceRoot}/bin/windows-x64/fbuild.exe",
 			},
 			"linux": {
-				"args": [
-					"-Wall",
-					"-Wno-unused-variable",
-					"-Wno-missing-braces",
-					"-g",
-					"-Og",
-					"--std=c++17",
-					"-DVOLCANO_USE_GLFW",
-					"-I/usr/include",
-					"-I${env:VULKAN_SDK}/include",
-					"-I${workspaceRoot}/../glm",
-					"-I${workspaceRoot}/../volk",
-					"-I${workspaceRoot}/../VulkanMemoryAllocator/src",
-					"-I${workspaceRoot}/../stb",
-					"-I${workspaceRoot}/../imgui",
-					"-I${workspaceRoot}/../glfw/include",
-					"-L${env:VULKAN_SDK}/lib",
-					"-L${workspaceRoot}/../glfw/build/src",
-					"src/Volcano.cpp",
-					"src/VkUtil.cpp",
-					"src/platform/glfw/Main.cpp",
-					"src/imgui/imgui_impl.cpp",
-					"src/imgui/platform/glfw/imgui_impl_glfw.cpp",
-					"-ovolcano",
-					"-lm",
-					"-ldl",
-					"-lpthread",
-					"-lstdc++",
-					"-lX11",
-				],
+				"command": "${workspaceRoot}/bin/linux-x64/fbuild",
 			},
-			"problemMatcher": {
+			"args": [
+				{
+					"value": "-cache -cacheverbose -clean -summary all",
+					"quoting": "weak"
+				}
+			],
+			"group": "build",
+            "problemMatcher": {
                 "owner": "cpp",
                 "fileLocation": ["relative", "${workspaceRoot}"],
                 "pattern": {
@@ -109,6 +63,6 @@
                     "message": 5
                 }
             }
-        }
+        },
     ]
 }
