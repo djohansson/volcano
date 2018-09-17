@@ -58,7 +58,7 @@ Compiler('Compiler-Clang')
 	.BaseCompilerOptions = '-o "%2" "%1" -c -g'
 		+ .BaseIncludePaths
 #if __WINDOWS__
-		+ ' -D__WINDOWS__ -DWIN32 -D_WIN32 -D_CRT_SECURE_NO_WARNINGS'
+		+ ' -gcodeview -D__WINDOWS__ -DWIN32 -D_WIN32 -D_CRT_SECURE_NO_WARNINGS'
 #endif //__WINDOWS__
 #if __LINUX__
 		+ ' -D__LINUX__ -D__linux__'
@@ -69,6 +69,9 @@ Compiler('Compiler-Clang')
 		+ ' -Wall'
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
+#if __WINDOWS__
+		+ ' -gcodeview'
+#endif //__WINDOWS__
 	.LinkerOptions = .BaseLinkerOptions
 		+ ' -lstdc++'
 	.LibrarianOptions = 'rcs "%2" "%1"'
@@ -91,7 +94,7 @@ Compiler('Compiler-Clang')
 		+ .CompilerDebugOptimizations
 	.LibrarianOptions + .LibrarianDebugOptimizations
 	.LinkerOptions + .LinkerDebugOptimizations
-#if __WINDOWS__
+#if __WINDOWS__  // todo: make way to configure dynamic vs static loading of CRT & system libs
 		+ ' -lmsvcrtd'
 #endif //__WINDOWS__
 ]
@@ -102,6 +105,9 @@ Compiler('Compiler-Clang')
 		+ .CompilerReleaseOptimizations
 	.LibrarianOptions + .LibrarianReleaseOptimizations
 	.LinkerOptions + .LinkerReleaseOptimizations
+#if __WINDOWS__  // todo: make way to configure dynamic vs static loading of CRT & system libs
+		+ ' -lmsvcrt'
+#endif //__WINDOWS__
 ]
 .Clang_x64_ProfileConfig = [
 	Using(.Clang_x64_ReleaseConfig)

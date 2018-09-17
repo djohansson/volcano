@@ -5,22 +5,40 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "(Windows) Attach",
-			"type": "cppvsdbg",
-			"request": "attach",
-			"processId": "${command:pickProcess}"
-		},
-		{
-			"name": "(Windows) Launch",
+			"name": "(Windows) Launch Debug",
 			"type": "cppvsdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/volcano-Debug.exe",
+			"program": "volcano-Debug.exe",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
 			"externalConsole": true,
-			"symbolSearchPath": "srv*d:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+		},
+		{
+			"name": "(Windows) Launch Profile",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "volcano-Profile.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": true,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+		},
+		{
+			"name": "(Windows) Launch Release",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "volcano-Release.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": true,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
 		}
 	]
 }

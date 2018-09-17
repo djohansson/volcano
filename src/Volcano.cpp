@@ -2,6 +2,7 @@
 #include "Core.h"
 #include "Math.h"
 #include "VkUtil.h"
+#include "extern/fixed_allocator.h"
 
 #include <volk.h>
 
@@ -15,7 +16,6 @@
 #	define NOMINMAX
 #	include <wtypes.h>
 #	include <vulkan/vulkan_win32.h>
-#	include <ppl.h>
 #elif defined(__APPLE__)
 #	include <vulkan/vulkan_macos.h>
 #elif defined(__linux__)
@@ -49,14 +49,17 @@
 #include <imgui.h>
 #include <examples/imgui_impl_vulkan.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <execution>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 
 
@@ -65,7 +68,7 @@ class VulkanApplication
 public:
 	VulkanApplication(void* view, int width, int height, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
-		//, myVerboseFlag(verbose)
+		, myThreadCount(std::thread::hardware_concurrency())
 	{
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		initVulkan(view, width, height, surface);
@@ -1145,7 +1148,7 @@ private:
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
-		
+
 		myCommandPools.resize(myThreadCount);
 		myCommandBuffers.resize(myThreadCount * myBufferCount);
 		for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
@@ -1356,11 +1359,13 @@ private:
 			if (drawCount % segmentCount)
 				segmentDrawCount += 1;
 
-#if defined(_WIN32)
-			concurrency::parallel_for(0u, segmentCount, [&](int segmentIt)
-#else
-			for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
-#endif
+			std::vector<uint32_t, fixed_allocator<uint32_t, 128>> seq(segmentCount);
+			std::iota(seq.begin(), seq.end(), 0);
+			std::for_each_n(
+				std::execution::par_unseq,
+				seq.begin(),
+				seq.size(),
+				[this, &dx, &dy, &drawCount, &segmentDrawCount](uint32_t segmentIt)
 			{
 				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + (segmentIt + 1)];
 
@@ -1395,11 +1400,7 @@ private:
 
 					drawSpinningLogo(cmd, i * dx, j * dy, dx, dy);
 				}
-#if defined(_WIN32)
 			});
-#else
-			}
-#endif
 		}
 
 		for (uint32_t cmdIt = 1; cmdIt < myThreadCount; cmdIt++)
@@ -1625,8 +1626,8 @@ private:
 
 	const std::string myResourcePath;
 
-	uint32_t myBufferCount = 16;
-	uint32_t myThreadCount = 16;
+	uint32_t myBufferCount = 0;
+	uint32_t myThreadCount = 0;
 };
 
 const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
