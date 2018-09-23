@@ -7,10 +7,12 @@
 .WindowsUcrtLibPath = '$WindowsSDKBasePath$\Lib\10.0.17134.0\ucrt\x86'
 .WindowsUcrtIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\ucrt'
 .WindowsSharedIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\shared'
-Settings {
+Settings
+{
 	#import TMP
 	#import windir
-	.Environment = {
+	.Environment =
+	{
 		'TMP=$TMP$',
 		'SystemRoot=$windir$'
 	}
@@ -25,7 +27,8 @@ Settings {
 #if __LINUX__
 .LLVMBasePath = '/usr/bin'
 .ClangPath = '$LLVMBasePath$'
-Settings {
+Settings
+{
 	.CachePath = "/tmp/.fbuild.cache"
 }
 .BaseIncludePaths = ' -I/usr/include'
@@ -69,9 +72,6 @@ Compiler('Compiler-Clang')
 		+ ' -Wall'
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
-#if __WINDOWS__
-		+ ' -gcodeview'
-#endif //__WINDOWS__
 	.LinkerOptions = .BaseLinkerOptions
 		+ ' -lstdc++'
 	.LibrarianOptions = 'rcs "%2" "%1"'
