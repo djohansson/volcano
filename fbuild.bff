@@ -218,21 +218,24 @@ Compiler('Compiler-Clang')
 	}
 }
 
-
-Copy('CopyVulkanLib')
+Copy('CopyVulkan')
 {
 #if __OSX__
-  .Source   = { '$VulkanSDKPath$/lib/libvulkan.1.dylib' }
-  .Dest     = '$ProjectPath$/bin/osx-x64/'
+	.Source =
+	{
+		'$VulkanSDKPath$/lib/libvulkan.dylib',
+		'$VulkanSDKPath$/lib/libvulkan.1.dylib',
+		'$VulkanSDKPath$/lib/libvulkan.1.1.82.dylib'
+	}
+	.Dest = '$ProjectPath$/bin/osx-x64/'
 #endif
 }
-
 
 Alias('release')
 {
 	.Targets =
 	{
-		'CopyVulkanLib',
+		'CopyVulkan',
 		'$ProjectName$-Lib-Release',
 		'$ProjectName$-Release'
 	}
@@ -242,7 +245,7 @@ Alias('profile')
 {
 	.Targets =
 	{
-		'CopyVulkanLib',
+		'CopyVulkan',
 		'$ProjectName$-Lib-Profile',
 		'$ProjectName$-Profile'
 	}
@@ -252,7 +255,7 @@ Alias('debug')
 {
 	.Targets =
 	{
-		'CopyVulkanLib',
+		'CopyVulkan',
 		'$ProjectName$-Lib-Debug',
 		'$ProjectName$-Debug'
 	}

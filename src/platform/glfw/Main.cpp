@@ -28,8 +28,8 @@ static void glfw_resize_callback(GLFWwindow*, int w, int h)
 int main(int, char**)
 {
 	// todo: parse commandline
-	static const uint32_t width = 1920;
-	static const uint32_t height = 1080;
+	static const uint32_t width = 1280;
+	static const uint32_t height = 720;
 
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);

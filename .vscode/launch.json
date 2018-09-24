@@ -15,8 +15,8 @@
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
 				{ "name":"VK_SDK_DIR", "value":"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS" },
-				{ "name":"VK_ICD_FILENAMES", "value":"$VK_SDK_DIR/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"$VK_SDK_DIR/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VK_SDK_DIR}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VK_SDK_DIR}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
@@ -33,8 +33,8 @@
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
 				{ "name":"VK_SDK_DIR", "value":"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS" },
-				{ "name":"VK_ICD_FILENAMES", "value":"$VK_SDK_DIR/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"$VK_SDK_DIR/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VK_SDK_DIR}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VK_SDK_DIR}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
@@ -51,8 +51,8 @@
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
 				{ "name":"VK_SDK_DIR", "value":"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS" },
-				{ "name":"VK_ICD_FILENAMES", "value":"$VK_SDK_DIR/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"$VK_SDK_DIR/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VK_SDK_DIR}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VK_SDK_DIR}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
