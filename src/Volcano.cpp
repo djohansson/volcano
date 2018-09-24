@@ -1363,14 +1363,14 @@ private:
 			if (drawCount % segmentCount)
 				segmentDrawCount += 1;
 
-			std::vector<uint32_t> seq(segmentCount);
-			std::iota(seq.begin(), seq.end(), 0);
+			std::array<uint32_t, 128> seq;
+			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
 			std::for_each_n(
 			#ifndef __APPLE__
-				std::execution::par_unseq,
+				std::execution::par,
 			#endif
 				seq.begin(),
-				seq.size(),
+				segmentCount,
 				[this, &dx, &dy, &drawCount, &segmentDrawCount](uint32_t segmentIt)
 			{
 				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + (segmentIt + 1)];
