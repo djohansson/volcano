@@ -20,7 +20,6 @@
 @interface RenderView()
 {
     CVDisplayLinkRef myDisplayLink;
-    unsigned int myFrameIndex;
 }
 - (CVReturn)getFrameForTime:(const CVTimeStamp*)outputTime;
 @end
@@ -62,9 +61,7 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
     renderLayer.framebufferOnly = YES;
     renderLayer.frame = self.bounds;
     renderLayer.drawableSize = size;
-    
-    myFrameIndex = 0;
-    
+        
     CFURLRef resourceURL = CFURLCopyAbsoluteURL(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
     char resourcePath[1024];
     CFStringGetFileSystemRepresentation(CFURLCopyFileSystemPath(resourceURL, kCFURLPOSIXPathStyle), resourcePath, sizeof(resourcePath) - 1);

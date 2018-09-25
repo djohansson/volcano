@@ -7,7 +7,6 @@
 
 #if defined(VOLCANO_USE_GLFW)
 #	define GLFW_INCLUDE_NONE
-#	define GLFW_INCLUDE_VULKAN
 #	include <GLFW/glfw3.h>
 #endif
 
@@ -53,9 +52,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#ifndef __APPLE__
 #include <execution>
+#endif
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -384,7 +386,8 @@ private:
 		vkEnumerateDeviceExtensionProperties(myPhysicalDevice, nullptr, &deviceExtensionCount,
 			availableDeviceExtensions.data());
 
-		std::vector<const char*> deviceExtensions(deviceExtensionCount);
+		std::vector<const char*> deviceExtensions;
+        deviceExtensions.reserve(deviceExtensionCount);
 		for (uint32_t i = 0; i < deviceExtensionCount; i++)
 		{
 #if defined(__APPLE__)
@@ -393,8 +396,8 @@ private:
 				strcmp(availableDeviceExtensions[i].extensionName, "VK_MVK_macos_surface") == 0)
 				continue;
 #endif
-			deviceExtensions[i] = availableDeviceExtensions[i].extensionName;
-			std::cout << deviceExtensions[i] << "\n";
+			deviceExtensions.push_back(availableDeviceExtensions[i].extensionName);
+			std::cout << deviceExtensions.back() << "\n";
 		}
 
 		std::sort(deviceExtensions.begin(), deviceExtensions.end(),
@@ -876,6 +879,8 @@ private:
 		CHECK_VK(vmaMapMemory(myAllocator, stagingBufferMemory, &data));
 		memcpy(data, bufferData, bufferSize);
 		vmaUnmapMemory(myAllocator, stagingBufferMemory);
+
+		vmaFlushAllocation(myAllocator, stagingBufferMemory, 0, VK_WHOLE_SIZE);
 
 		createBuffer(bufferSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outBuffer, outBufferMemory);
@@ -1365,7 +1370,9 @@ private:
 			std::array<uint32_t, 128> seq;
 			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
 			std::for_each_n(
+			#ifndef __APPLE__
 				std::execution::par,
+			#endif
 				seq.begin(),
 				segmentCount,
 				[this, &dx, &dy, &drawCount, &segmentDrawCount](uint32_t segmentIt)
@@ -1664,8 +1671,10 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 	assert(view != nullptr);
 	assert(theApp == nullptr);
 
+#if defined(__WINDOWS__)
 	static const char* DISABLE_VK_LAYER_VALVE_steam_overlay_1 = "DISABLE_VK_LAYER_VALVE_steam_overlay_1=1";
 	_putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
+#endif
 
 	if (verbose)
 	{
