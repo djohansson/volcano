@@ -58,7 +58,7 @@ VkFormat findSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat
 	return VK_FORMAT_UNDEFINED;
 }
 
-int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device)
+int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device, SwapChainInfo& outSwapChainInfo)
 {
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -66,36 +66,29 @@ int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device)
 	VkPhysicalDeviceFeatures deviceFeatures;
 	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-	struct SwapChainInfo
-	{
-		VkSurfaceCapabilitiesKHR capabilities;
-		std::vector<VkSurfaceFormatKHR> formats;
-		std::vector<VkPresentModeKHR> presentModes;
-	} swapChainInfo;
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &swapChainInfo.capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &outSwapChainInfo.capabilities);
 
 	uint32_t formatCount;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
 	if (formatCount != 0)
 	{
-		swapChainInfo.formats.resize(formatCount);
+		outSwapChainInfo.formats.resize(formatCount);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
-			swapChainInfo.formats.data());
+			outSwapChainInfo.formats.data());
 	}
 
-	assert(!swapChainInfo.formats.empty());
+	assert(!outSwapChainInfo.formats.empty());
 
 	uint32_t presentModeCount;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
 	if (presentModeCount != 0)
 	{
-		swapChainInfo.presentModes.resize(presentModeCount);
+		outSwapChainInfo.presentModes.resize(presentModeCount);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount,
-			swapChainInfo.presentModes.data());
+			outSwapChainInfo.presentModes.data());
 	}
 
-	assert(!swapChainInfo.presentModes.empty());
+	assert(!outSwapChainInfo.presentModes.empty());
 
 	// if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // lets run on
 	// the integrated for now to save battery

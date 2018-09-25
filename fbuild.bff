@@ -49,10 +49,9 @@ Compiler('Compiler-Clang')
 {
 #if __WINDOWS__
 	.Executable = '$ClangPath$/clang++.exe'
-#endif //__WINDOWS__
-#if !__WINDOWS__
+#else
 	.Executable = '$ClangPath$/clang++'
-#endif //!__WINDOWS__
+#endif //__WINDOWS__
 }
 
 .Clang_BaseConfig = [
@@ -73,25 +72,36 @@ Compiler('Compiler-Clang')
 	.Linker = '$ClangPath$/clang++'
 #endif //__LINUX__
 	.Compiler = 'Compiler-Clang'
-	.BaseCompilerOptions = '-o "%2" "%1" -c -g -v'
+	.BaseCompilerOptions = '-o "%2" "%1" -c -g'
 		+ .BaseIncludePaths
 #if __WINDOWS__
-		+ ' -D__WINDOWS__ -DWIN32 -D_WIN32 -D_CRT_SECURE_NO_WARNINGS -gcodeview'
+		+ ' -D__WINDOWS__'
+		+ ' -DWIN32'
+		+ ' -D_WIN32'
+		+ ' -D_CRT_SECURE_NO_WARNINGS'
+		+ ' -gcodeview'
 #endif //__WINDOWS__
 #if __OSX__
-		+ ' -D__APPLE__ -D__OSX__'
+		+ ' -D__APPLE__'
+		+ ' -D__OSX__'
 #endif //__LINUX__
 #if __LINUX__
-		+ ' -D__LINUX__ -D__linux__'
+		+ ' -D__LINUX__'
+		+ ' -D__linux__'
 #endif //__LINUX__
 	.CompilerOptionsC = ' -std=c11'
 	.CompilerOptionsCpp = ' -std=c++17'
 	.CompilerOptions = .BaseCompilerOptions
 		+ ' -Wall'
-	.BaseLinkerOptions = '"%1" -o "%2" -g -v'
+	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
 	.LinkerOptions = .BaseLinkerOptions
-		+ ' -lstdc++'
+#if __OSX__
+	+ ' -lc++'
+#else
+	+ ' -lstdc++'
+#endif
+	
 	.LibrarianOptions = 'rcs "%2" "%1"'
 	.CompilerDebugOptimizations = ' -O0'
 	.CompilerReleaseOptimizations = ' -O3'
@@ -112,7 +122,7 @@ Compiler('Compiler-Clang')
 		+ .CompilerDebugOptimizations
 	.LibrarianOptions + .LibrarianDebugOptimizations
 	.LinkerOptions + .LinkerDebugOptimizations
-#if __WINDOWS__  // todo: make way to configure dynamic vs static loading of CRT & system libs
+#if __WINDOWS__  // apparently this is neded for debug builds
 		+ ' -lmsvcrtd'
 #endif //__WINDOWS__
 ]
@@ -123,9 +133,6 @@ Compiler('Compiler-Clang')
 		+ .CompilerReleaseOptimizations
 	.LibrarianOptions + .LibrarianReleaseOptimizations
 	.LinkerOptions + .LinkerReleaseOptimizations
-#if __WINDOWS__  // todo: make way to configure dynamic vs static loading of CRT & system libs
-		+ ' -lmsvcrt'
-#endif //__WINDOWS__
 ]
 .Clang_x64_ProfileConfig = [
 	Using(.Clang_x64_ReleaseConfig)
@@ -163,10 +170,9 @@ Compiler('Compiler-Clang')
 				+ ' -Wno-expansion-to-defined'
 				+ ' -Wno-nonportable-include-path'
 				+ ' -Wno-deprecated-declarations'
-#endif //__WINDOWS__
-#if !__WINDOWS__
+#else
 				+ ' -Wno-unused-variable'
-#endif //!__WINDOWS__
+#endif //__WINDOWS__
 		ObjectList('$ProjectName$-Lib-$Config$')
 		{
 			// todo: make separate ObjectLists depending on source file type

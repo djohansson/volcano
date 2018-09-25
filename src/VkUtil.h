@@ -33,6 +33,18 @@ public:
 	// ...
 };
 
+struct SwapChainInfo
+{
+	VkSurfaceCapabilitiesKHR capabilities;
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> presentModes;
+};
+
+static inline bool operator==(VkSurfaceFormatKHR lhs, const VkSurfaceFormatKHR& rhs)
+{
+	return lhs.format == rhs.format && lhs.colorSpace == rhs.colorSpace;
+}
+
 static inline void CHECK_VK(VkResult err)
 {
 	(void)err;
@@ -54,6 +66,6 @@ VkFormat findSupportedFormat(
 	VkImageTiling tiling,
 	VkFormatFeatureFlags features);
 
-int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device);
+int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device, SwapChainInfo& outSwapChainInfo);
 
 void readSPIRVFile(const std::string& filename, std::vector<char>& outData);

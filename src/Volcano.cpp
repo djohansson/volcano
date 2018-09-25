@@ -71,14 +71,12 @@ public:
 		: myResourcePath(resourcePath)
 		, myThreadCount(std::thread::hardware_concurrency())
 	{
-		VkSurfaceKHR surface = VK_NULL_HANDLE;
-		
 		createInstance();
 		createDebugCallback();
 		
-		createSurface(view, surface);
-		
-		createDevice(surface);
+		createSurface(view);
+		createDevice();
+
 		createAllocator();
 
 		createTextureSampler();
@@ -86,10 +84,7 @@ public:
 		createDescriptorPool();
 		createDescriptorSetLayout();
 
-		createDepthResources(width, height);
-		initIMGUI(width, height, surface);
-		createRenderPass();
-		createGraphicsPipeline();
+		createFrameResources(width, height);
 
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
@@ -121,6 +116,8 @@ public:
 			myUniformBuffer, myUniformBufferMemory);
 		
 		createDescriptorSet();
+
+		initIMGUI();
 	}
 
 	~VulkanApplication()
@@ -172,11 +169,13 @@ public:
 		presentFrame();
 	}
 
-	void resize(int /*width*/, int /*height*/)
+	void resize(int width, int height)
 	{
 		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
 		
-		cleanupSwapchainResources();
+		cleanupFrameResources();
+
+		createFrameResources(width, height);
 	}
 
 private:
@@ -285,11 +284,11 @@ private:
 			&myDebugCallback));
 	}
 
-	void createSurface(void* view, VkSurfaceKHR& outSurface)
+	void createSurface(void* view)
 	{
 #if defined(VOLCANO_USE_GLFW)
 		CHECK_VK(glfwCreateWindowSurface(myInstance, reinterpret_cast<GLFWwindow*>(view), nullptr,
-			&outSurface));
+			&mySurface));
 #elif defined(_WIN32)
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -299,7 +298,7 @@ private:
 		auto vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(
 			myInstance, "vkCreateWin32SurfaceKHR");
 		assert(vkCreateWin32SurfaceKHR != nullptr);
-		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #elif defined(__APPLE__)
 		VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
@@ -308,7 +307,7 @@ private:
 		auto vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr(
 			myInstance, "vkCreateMacOSSurfaceMVK");
 		assert(vkCreateMacOSSurfaceMVK != nullptr);
-		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #elif defined(__linux__)
 #	if defined(VK_USE_PLATFORM_XCB_KHR)
 		VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
@@ -319,7 +318,7 @@ private:
 		auto vkCreateXcbSurfaceKHR =
 			(PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXcbSurfaceKHR");
 		assert(vkCreateXcbSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	elif defined(VK_USE_PLATFORM_XLIB_KHR)
 		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -329,7 +328,7 @@ private:
 		auto vkCreateXlibSurfaceKHR =
 			(PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXlibSurfaceKHR");
 		assert(vkCreateXlibSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 		VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
@@ -339,12 +338,12 @@ private:
 		auto vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(
 			myInstance, "vkCreateWaylandSurfaceKHR");
 		assert(vkCreateWaylandSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	endif
 #endif
 	}
 
-	void createDevice(VkSurfaceKHR surface)
+	void createDevice()
 	{
 		uint32_t deviceCount = 0;
 		CHECK_VK(vkEnumeratePhysicalDevices(myInstance, &deviceCount, nullptr));
@@ -356,10 +355,59 @@ private:
 
 		for (const auto& device : devices)
 		{
-			myQueueFamilyIndex = isDeviceSuitable(surface, device);
+			SwapChainInfo swapChain;
+			myQueueFamilyIndex = isDeviceSuitable(mySurface, device, swapChain);
 			if (myQueueFamilyIndex >= 0)
 			{
 				myPhysicalDevice = device;
+
+				const VkFormat requestSurfaceImageFormat[] =
+				{
+					VK_FORMAT_B8G8R8A8_UNORM,
+					VK_FORMAT_R8G8B8A8_UNORM,
+					VK_FORMAT_B8G8R8_UNORM,
+					VK_FORMAT_R8G8B8_UNORM
+				};
+				const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+				const VkPresentModeKHR requestPresentMode[] =
+				{
+					VK_PRESENT_MODE_MAILBOX_KHR,
+					VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+					VK_PRESENT_MODE_FIFO_KHR,
+					VK_PRESENT_MODE_IMMEDIATE_KHR
+				};
+
+				// Request several formats, the first found will be used 
+				// If none of the requested image formats could be found, use the first available
+				mySurfaceFormat = swapChain.formats[0];
+				for (uint32_t request_i = 0; request_i < sizeof_array(requestSurfaceImageFormat); request_i++)
+				{
+					VkSurfaceFormatKHR requestedFormat = { requestSurfaceImageFormat[request_i], requestSurfaceColorSpace };
+					auto formatIt = std::find(swapChain.formats.begin(), swapChain.formats.end(), requestedFormat);
+					if (formatIt != swapChain.formats.end())
+					{
+						mySurfaceFormat = *formatIt;
+						break;
+					}
+				}
+
+				// Request a certain mode and confirm that it is available. If not use VK_PRESENT_MODE_FIFO_KHR which is mandatory
+				myPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+				myBufferCount = 2;
+				for (uint32_t request_i = 0; request_i < sizeof_array(requestPresentMode); request_i++)
+				{
+					auto modeIt = std::find(swapChain.presentModes.begin(), swapChain.presentModes.end(), requestPresentMode[request_i]);
+					if (modeIt != swapChain.presentModes.end())
+					{
+						myPresentMode = *modeIt;
+						
+						if (myPresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+							myBufferCount = 3;
+
+						break;
+					}
+				}
+
 				break;
 			}
 		}
@@ -481,27 +529,6 @@ private:
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
 		CHECK_VK(myDeviceTable.vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
-	}
-
-	void createDepthResources(int width, int height)
-	{
-		myDepthFormat = findSupportedFormat(
-			myPhysicalDevice,
-			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-		createImage2D(
-			width,
-			height,
-			myDepthFormat,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			myDepthImage,
-			myDepthImageMemory);
-
-		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 	}
 
 	void createDescriptorSetLayout()
@@ -1095,7 +1122,7 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
-	void initIMGUI(int width, int height, VkSurfaceKHR surface)
+	void initIMGUI()
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -1126,26 +1153,39 @@ private:
 		ImGui::StyleColorsClassic();
 		io.FontDefault = myFonts.back();
 
-		const VkFormat requestSurfaceImageFormat[] = {
-			VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM,
-			VK_FORMAT_R8G8B8_UNORM };
-		const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-		VkSurfaceFormatKHR surfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
-			myPhysicalDevice, surface, requestSurfaceImageFormat,
-			static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)),
-			requestSurfaceColorSpace);
+		// Setup Vulkan binding
+		ImGui_ImplVulkan_InitInfo initInfo = {};
+		initInfo.Instance = myInstance;
+		initInfo.PhysicalDevice = myPhysicalDevice;
+		initInfo.Device = myDevice;
+		initInfo.QueueFamily = myQueueFamilyIndex;
+		initInfo.Queue = myQueue;
+		initInfo.PipelineCache = VK_NULL_HANDLE;
+		initInfo.DescriptorPool = myDescriptorPool;
+		initInfo.Allocator = myAllocator;
+		initInfo.HostAllocationCallbacks = nullptr;
+		initInfo.CheckVkResultFn = CHECK_VK;
+		ImGui_ImplVulkan_Init(&initInfo, myWindowData->RenderPass);
 
-		VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-		presentMode =
-			ImGui_ImplVulkanH_SelectPresentMode(myPhysicalDevice, surface, &presentMode, 1);
+		// Upload Fonts
+		{
+			VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+			ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+			endSingleTimeCommands(commandBuffer);
+			ImGui_ImplVulkan_InvalidateFontUploadObjects();
+		}
+	}
 
-		myBufferCount = presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2;
-
+	void createFrameResources(int width, int height)
+	{
 		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(myBufferCount);
 
-		myWindowData->SurfaceFormat = surfaceFormat;
-		myWindowData->Surface = surface;
-		myWindowData->PresentMode = presentMode;
+		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
+		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
+
+		myWindowData->SurfaceFormat = mySurfaceFormat;
+		myWindowData->Surface = mySurface;
+		myWindowData->PresentMode = myPresentMode;
 
 		myWindowData->ClearEnable = false; // we will clear before IMGUI, using myWindowData->ClearValue
 		myWindowData->ClearValue.color.float32[0] = 0.4f;
@@ -1153,12 +1193,31 @@ private:
 		myWindowData->ClearValue.color.float32[2] = 0.5f;
 		myWindowData->ClearValue.color.float32[3] = 1.0f;
 
+		myDepthFormat = findSupportedFormat(
+			myPhysicalDevice,
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+		createImage2D(
+			width,
+			height,
+			myDepthFormat,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			myDepthImage,
+			myDepthImageMemory);
+
+		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+		myCommandPools.resize(myThreadCount);
+		myCommandBuffers.resize(myThreadCount * myBufferCount);
+
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
 
-		myCommandPools.resize(myThreadCount);
-		myCommandBuffers.resize(myThreadCount * myBufferCount);
 		for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
 		{
 			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
@@ -1202,36 +1261,14 @@ private:
 		}
 		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
 
-		// Setup Vulkan binding
-		ImGui_ImplVulkan_InitInfo initInfo = {};
-		initInfo.Instance = myInstance;
-		initInfo.PhysicalDevice = myPhysicalDevice;
-		initInfo.Device = myDevice;
-		initInfo.QueueFamily = myQueueFamilyIndex;
-		initInfo.Queue = myQueue;
-		initInfo.PipelineCache = VK_NULL_HANDLE;
-		initInfo.DescriptorPool = myDescriptorPool;
-		initInfo.Allocator = myAllocator;
-		initInfo.HostAllocationCallbacks = nullptr;
-		initInfo.CheckVkResultFn = CHECK_VK;
-		ImGui_ImplVulkan_Init(&initInfo, myWindowData->RenderPass);
-
-		// Upload Fonts
-		{
-			VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-			ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-			endSingleTimeCommands(commandBuffer);
-			ImGui_ImplVulkan_InvalidateFontUploadObjects();
-		}
-
 		transitionImageLayout(
 			myDepthImage,
 			myDepthFormat,
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
-		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
+		createRenderPass();
+		createGraphicsPipeline();
 	}
 
 	void checkFlipOrPresentResult(VkResult result)
@@ -1496,7 +1533,7 @@ private:
 		checkFlipOrPresentResult(vkQueuePresentKHR(myQueue, &info));
 	}
 
-	void cleanupSwapchainResources()
+	void cleanupFrameResources()
 	{
 		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
 		{
@@ -1518,7 +1555,7 @@ private:
 			}
 		}
 
-		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myInstance, myDevice, myWindowData.get(), nullptr);
+		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myDevice, myWindowData.get(), nullptr);
 
 		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
 		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
@@ -1530,7 +1567,7 @@ private:
 
 	void cleanup()
 	{
-		cleanupSwapchainResources();
+		cleanupFrameResources();
 
 		ImGui_ImplVulkan_Shutdown();
 
@@ -1551,6 +1588,8 @@ private:
 		vmaDestroyAllocator(myAllocator);
 
 		myDeviceTable.vkDestroyDevice(myDevice, nullptr);
+		
+		vkDestroySurfaceKHR(myInstance, mySurface, nullptr);
 
 		vkDestroyDebugReportCallbackEXT(myInstance, myDebugCallback, nullptr);
 
@@ -1603,6 +1642,9 @@ private:
 
 	VkInstance myInstance = VK_NULL_HANDLE;
 	VkDebugReportCallbackEXT myDebugCallback = VK_NULL_HANDLE;
+	VkSurfaceKHR mySurface = VK_NULL_HANDLE; // todo: take ownership of this object from IMGUI
+	VkSurfaceFormatKHR mySurfaceFormat = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	VkPresentModeKHR myPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 	VkPhysicalDevice myPhysicalDevice = VK_NULL_HANDLE;
 	VkDevice myDevice = VK_NULL_HANDLE;
 	VolkDeviceTable myDeviceTable = {};
