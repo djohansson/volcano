@@ -2,7 +2,6 @@
 #include "Core.h"
 #include "Math.h"
 #include "VkUtil.h"
-#include "extern/fixed_allocator.h"
 
 #include <volk.h>
 
@@ -71,9 +70,25 @@ public:
 		, myThreadCount(std::thread::hardware_concurrency())
 	{
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
-		initVulkan(view, width, height, surface);
-		initIMGUI(height, width, surface);
 		
+		createInstance();
+		createDebugCallback();
+		
+		createSurface(view, surface);
+		
+		createDevice(surface);
+		createAllocator();
+
+		createTextureSampler();
+
+		createDescriptorPool();
+		createDescriptorSetLayout();
+
+		createDepthResources(width, height);
+		initIMGUI(width, height, surface);
+		createRenderPass();
+		createGraphicsPipeline();
+
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
 			myVertexBufferMemory);
@@ -102,17 +117,14 @@ public:
 		createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			myUniformBuffer, myUniformBufferMemory);
-
-		// create pipeline and descriptors
-		createTextureSampler();
-		createDescriptorSetLayout();
+		
 		createDescriptorSet();
-		createRenderPass();
-		createGraphicsPipeline();
 	}
 
 	~VulkanApplication()
 	{
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+
 		cleanup();
 	}
 
@@ -160,7 +172,9 @@ public:
 
 	void resize(int /*width*/, int /*height*/)
 	{
-		// todo
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+		
+		cleanupSwapchainResources();
 	}
 
 private:
@@ -466,7 +480,7 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
 	}
 
-	void createDepthResources(int height, int width)
+	void createDepthResources(int width, int height)
 	{
 		myDepthFormat = findSupportedFormat(
 			myPhysicalDevice,
@@ -1076,18 +1090,7 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
-	void initVulkan(void* window, int height, int width, VkSurfaceKHR& outSurface)
-	{
-		createInstance();
-		createDebugCallback();
-		createSurface(window, outSurface);
-		createDevice(outSurface);
-		createAllocator();
-		createDescriptorPool();
-		createDepthResources(width, height);
-	}
-
-	void initIMGUI(int height, int width, VkSurfaceKHR surface)
+	void initIMGUI(int width, int height, VkSurfaceKHR surface)
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -1486,10 +1489,8 @@ private:
 		checkFlipOrPresentResult(vkQueuePresentKHR(myQueue, &info));
 	}
 
-	void cleanup()
+	void cleanupSwapchainResources()
 	{
-		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
-
 		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
 		{
 			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
@@ -1512,6 +1513,18 @@ private:
 
 		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myInstance, myDevice, myWindowData.get(), nullptr);
 
+		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
+		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
+
+		myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
+		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
+		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
+	}
+
+	void cleanup()
+	{
+		cleanupSwapchainResources();
+
 		ImGui_ImplVulkan_Shutdown();
 
 		ImGui::DestroyContext();
@@ -1519,19 +1532,14 @@ private:
 		vmaDestroyBuffer(myAllocator, myUniformBuffer, myUniformBufferMemory);
 		vmaDestroyBuffer(myAllocator, myVertexBuffer, myVertexBufferMemory);
 		vmaDestroyBuffer(myAllocator, myIndexBuffer, myIndexBufferMemory);
-		vmaDestroyImage(myAllocator, myImage, myImageMemory);
-		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
 		
+		vmaDestroyImage(myAllocator, myImage, myImageMemory);
 		myDeviceTable.vkDestroyImageView(myDevice, myImageView, nullptr);
-		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
+
 		myDeviceTable.vkDestroySampler(myDevice, mySampler, nullptr);
 
 		myDeviceTable.vkDestroyDescriptorSetLayout(myDevice, myDescriptorSetLayout, nullptr);
 		myDeviceTable.vkDestroyDescriptorPool(myDevice, myDescriptorPool, nullptr);
-
-		myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
-		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
-		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
 
 		vmaDestroyAllocator(myAllocator);
 
