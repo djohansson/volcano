@@ -69,7 +69,7 @@ class VulkanApplication
 public:
 	VulkanApplication(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
-		, myThreadCount(std::thread::hardware_concurrency())
+		, myCommandListCount(std::thread::hardware_concurrency())
 	{
 		createInstance();
 		createDebugCallback();
@@ -1216,30 +1216,30 @@ private:
 
 		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-		myCommandPools.resize(myThreadCount);
-		myCommandBuffers.resize(myThreadCount * myBufferCount);
+		myCommandPools.resize(myCommandListCount);
+		myCommandBuffers.resize(myCommandListCount * myBufferCount);
 
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
 
-		for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
+		for (uint32_t cmdIt = 0; cmdIt < myCommandListCount; cmdIt++)
 		{
 			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
 			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[threadIt]));
-			assert(myCommandPools[threadIt] != VK_NULL_HANDLE);
+			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[cmdIt]));
+			assert(myCommandPools[cmdIt] != VK_NULL_HANDLE);
 
 			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
 			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-			cmdInfo.commandPool = myCommandPools[threadIt];
-			cmdInfo.level = threadIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+			cmdInfo.commandPool = myCommandPools[cmdIt];
+			cmdInfo.level = cmdIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 			cmdInfo.commandBufferCount = myBufferCount;
 			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
 
 			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-				myCommandBuffers[myThreadCount * bufferIt + threadIt] = threadCommandBuffers[bufferIt];
+				myCommandBuffers[myCommandListCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
 		}
 
 		myFrameFences.resize(myBufferCount);
@@ -1259,7 +1259,7 @@ private:
 			// IMGUI uses primary command buffer only
 			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
 			fd->CommandPool = myCommandPools[0];
-			fd->CommandBuffer = myCommandBuffers[myThreadCount * bufferIt];
+			fd->CommandBuffer = myCommandBuffers[myCommandListCount * bufferIt];
 			fd->Fence = myFrameFences[bufferIt];
 			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
 			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
@@ -1366,9 +1366,9 @@ private:
 		}
 
 		// begin secondary command buffers
-		for (uint32_t cmdIt = 1; cmdIt < myThreadCount; cmdIt++)
+		for (uint32_t cmdIt = 1; cmdIt < myCommandListCount; cmdIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + cmdIt];
+			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + cmdIt];
 
 			VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 			inherit.renderPass = myRenderPass;
@@ -1403,7 +1403,7 @@ private:
 			uint32_t dy = myWindowData->Height / ny;
 
 			uint32_t drawCount = nx * ny;
-			uint32_t segmentCount = std::max(myThreadCount - 1u, 1u);
+			uint32_t segmentCount = std::max(myCommandListCount - 1u, 1u);
 			uint32_t segmentDrawCount = drawCount / segmentCount;
 
 			if (drawCount % segmentCount)
@@ -1419,7 +1419,7 @@ private:
 				segmentCount,
 				[this, &dx, &dy, &drawCount, &segmentDrawCount](uint32_t segmentIt)
 			{
-				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + (segmentIt + 1)];
+				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + (segmentIt + 1)];
 
 				for (uint32_t drawIt = 0; drawIt < segmentDrawCount; drawIt++)
 				{
@@ -1455,9 +1455,9 @@ private:
 			});
 		}
 
-		for (uint32_t cmdIt = 1; cmdIt < myThreadCount; cmdIt++)
+		for (uint32_t cmdIt = 1; cmdIt < myCommandListCount; cmdIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + cmdIt];
+			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + cmdIt];
 
 			CHECK_VK(vkEndCommandBuffer(cmd));
 		}
@@ -1484,8 +1484,8 @@ private:
 			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 			vkCmdExecuteCommands(newFrame->CommandBuffer,
-				(myThreadCount - 1),
-				&myCommandBuffers[(myWindowData->FrameIndex * myThreadCount) + 1]);
+				(myCommandListCount - 1),
+				&myCommandBuffers[(myWindowData->FrameIndex * myCommandListCount) + 1]);
 
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
@@ -1549,14 +1549,14 @@ private:
 				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[bufferIt], nullptr);
 			}
 
-			for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
+			for (uint32_t cmdIt = 0; cmdIt < myCommandListCount; cmdIt++)
 			{
 				std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
 				for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-					threadCommandBuffers[bufferIt] = myCommandBuffers[myThreadCount * bufferIt + threadIt];
+					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandListCount * bufferIt + cmdIt];
 
-				vkFreeCommandBuffers(myDevice, myCommandPools[threadIt], myBufferCount, threadCommandBuffers.data());
-				vkDestroyCommandPool(myDevice, myCommandPools[threadIt], nullptr);
+				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myBufferCount, threadCommandBuffers.data());
+				vkDestroyCommandPool(myDevice, myCommandPools[cmdIt], nullptr);
 			}
 		}
 
@@ -1689,7 +1689,7 @@ private:
 	const std::string myResourcePath;
 
 	uint32_t myBufferCount = 0;
-	uint32_t myThreadCount = 0;
+	uint32_t myCommandListCount = 0;
 };
 
 const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
