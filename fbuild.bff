@@ -186,7 +186,7 @@ Compiler('Compiler-Clang')
 			}
 			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
 		}
-		Executable('$ProjectName$-$Config$')
+		Executable("$ProjectName$'-'$Config$")
 		{
 			.Libraries = { '$ProjectName$-Lib-$Config$' }
 		#if __WINDOWS__

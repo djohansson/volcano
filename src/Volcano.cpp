@@ -67,7 +67,7 @@
 class VulkanApplication
 {
 public:
-	VulkanApplication(void* view, int width, int height, const char* resourcePath, bool /*verbose*/)
+	VulkanApplication(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
 		, myThreadCount(std::thread::hardware_concurrency())
 	{
@@ -84,7 +84,7 @@ public:
 		createDescriptorPool();
 		createDescriptorSetLayout();
 
-		createFrameResources(width, height);
+		createFrameResources(framebufferWidth, framebufferHeight);
 
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
@@ -117,7 +117,10 @@ public:
 		
 		createDescriptorSet();
 
-		initIMGUI();
+		float dpiScaleX = static_cast<float>(framebufferWidth) / windowWidth;
+		float dpiScaleY = static_cast<float>(framebufferHeight) / windowHeight;
+
+		initIMGUI(dpiScaleX, dpiScaleY);
 	}
 
 	~VulkanApplication()
@@ -1122,13 +1125,15 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
-	void initIMGUI()
+	void initIMGUI(float dpiScaleX, float dpiScaleY)
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+		io.DisplayFramebufferScale = ImVec2(dpiScaleX, dpiScaleY);
 
 		ImFontConfig config;
 		config.OversampleH = 2;
@@ -1708,7 +1713,7 @@ const uint16_t VulkanApplication::ourIndices[] =
 
 static VulkanApplication* theApp = nullptr;
 
-int vkapp_create(void* view, int width, int height, const char* resourcePath, bool verbose)
+int vkapp_create(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool verbose)
 {
 	assert(view != nullptr);
 	assert(theApp == nullptr);
@@ -1733,7 +1738,7 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 			std::cout << VK_ICD_FILENAMES_STR << "=" << vkIcdFilenames << std::endl;
 	}
 
-	theApp = new VulkanApplication(view, width, height, resourcePath ? resourcePath : "./", verbose);
+	theApp = new VulkanApplication(view, windowWidth, windowHeight, framebufferWidth, framebufferHeight, resourcePath ? resourcePath : "./", verbose);
 
 	return EXIT_SUCCESS;
 }

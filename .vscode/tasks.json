@@ -16,8 +16,8 @@
 				"command": "${workspaceRoot}/bin/osx-x64/fbuild",
 			},
 			"args": [
-			//	"-cache",
-			//	"-cacheverbose",
+				"-cache",
+				"-cacheverbose",
 				"-summary",
 				"all"
 			],

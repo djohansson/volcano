@@ -22,8 +22,8 @@ static void glfw_resize_callback(GLFWwindow*, int w, int h)
 int main(int, char**)
 {
 	// todo: parse commandline
-	static constexpr uint32_t width = 1280;
-	static constexpr uint32_t height = 720;
+	static constexpr uint32_t windowWidth = 1280;
+	static constexpr uint32_t windowHeight = 720;
 
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);
@@ -31,7 +31,7 @@ int main(int, char**)
 		return 1;
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(width, height, "volcano", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "volcano", NULL, NULL);
 
 	// Setup Vulkan
 	if (!glfwVulkanSupported())
@@ -40,11 +40,12 @@ int main(int, char**)
 		return 1;
 	}
 
-	vkapp_create(window, width, height, "./resources/", true);
+	int framebufferWidth, framebufferHeight;
+	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+	vkapp_create(window, windowWidth, windowHeight, framebufferWidth, framebufferHeight, "./resources/", true);
 
 	// Create Framebuffer resize callback
-	int w, h;
-	glfwGetFramebufferSize(window, &w, &h);
 	glfwSetFramebufferSizeCallback(window, glfw_resize_callback);
 
 	// Setup GLFW binding
