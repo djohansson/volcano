@@ -69,7 +69,7 @@ class VulkanApplication
 public:
 	VulkanApplication(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
-		, myCommandListCount(std::thread::hardware_concurrency())
+		, myCommandBufferCount(std::thread::hardware_concurrency())
 	{
 		createInstance();
 		createDebugCallback();
@@ -111,9 +111,12 @@ public:
 		}
 
 		// create uniform buffer
-		createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			myUniformBuffer, myUniformBufferMemory);
+		createBuffer(
+			NX * NY * sizeof(UniformBufferObject),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			myUniformBuffer,
+			myUniformBufferMemory);
 		
 		createDescriptorSet();
 
@@ -167,7 +170,7 @@ public:
 
 		ImGui::Render();
 
-		updateUniformBuffer();
+		updateUniformBuffers();
 		submitFrame();
 		presentFrame();
 	}
@@ -511,22 +514,24 @@ private:
 	void createDescriptorPool()
 	{
 		constexpr uint32_t maxDescriptorCount = 1000;
-		VkDescriptorPoolSize poolSizes[] = {
-			{VK_DESCRIPTOR_TYPE_SAMPLER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, maxDescriptorCount} };
+		VkDescriptorPoolSize poolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, maxDescriptorCount }
+		};
 
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = (uint32_t)sizeof_array(poolSizes);
+		poolInfo.poolSizeCount = static_cast<uint32_t>(sizeof_array(poolSizes));
 		poolInfo.pPoolSizes = poolSizes;
 		poolInfo.maxSets = maxDescriptorCount * static_cast<uint32_t>(sizeof_array(poolSizes));
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -538,7 +543,7 @@ private:
 	{
 		VkDescriptorSetLayoutBinding uboLayoutBinding = {};
 		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		uboLayoutBinding.descriptorCount = 1;
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
@@ -576,7 +581,7 @@ private:
 		VkDescriptorBufferInfo bufferInfo = {};
 		bufferInfo.buffer = myUniformBuffer;
 		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(UniformBufferObject);
+		bufferInfo.range = VK_WHOLE_SIZE;
 
 		VkDescriptorImageInfo imageInfo = {};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -588,7 +593,7 @@ private:
 		descriptorWrites[0].dstSet = myDescriptorSet;
 		descriptorWrites[0].dstBinding = 0;
 		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		descriptorWrites[0].descriptorCount = 1;
 		descriptorWrites[0].pBufferInfo = &bufferInfo;
 		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -910,8 +915,6 @@ private:
 		memcpy(data, bufferData, bufferSize);
 		vmaUnmapMemory(myAllocator, stagingBufferMemory);
 
-		vmaFlushAllocation(myAllocator, stagingBufferMemory, 0, VK_WHOLE_SIZE);
-
 		createBuffer(bufferSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outBuffer, outBufferMemory);
 
@@ -1216,14 +1219,15 @@ private:
 
 		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-		myCommandPools.resize(myCommandListCount);
-		myCommandBuffers.resize(myCommandListCount * myBufferCount);
+		myCommandPools.resize(myCommandBufferCount);
+		myCommandBuffers.resize(myCommandBufferCount * myBufferCount);
 
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
 
-		for (uint32_t cmdIt = 0; cmdIt < myCommandListCount; cmdIt++)
+		std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+		for (uint32_t cmdIt = 0; cmdIt < myCommandBufferCount; cmdIt++)
 		{
 			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
@@ -1231,7 +1235,6 @@ private:
 			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[cmdIt]));
 			assert(myCommandPools[cmdIt] != VK_NULL_HANDLE);
 
-			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
 			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
 			cmdInfo.commandPool = myCommandPools[cmdIt];
 			cmdInfo.level = cmdIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
@@ -1239,7 +1242,7 @@ private:
 			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
 
 			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-				myCommandBuffers[myCommandListCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
+				myCommandBuffers[myCommandBufferCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
 		}
 
 		myFrameFences.resize(myBufferCount);
@@ -1259,7 +1262,7 @@ private:
 			// IMGUI uses primary command buffer only
 			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
 			fd->CommandPool = myCommandPools[0];
-			fd->CommandBuffer = myCommandBuffers[myCommandListCount * bufferIt];
+			fd->CommandBuffer = myCommandBuffers[myCommandBufferCount * bufferIt];
 			fd->Fence = myFrameFences[bufferIt];
 			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
 			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
@@ -1288,45 +1291,65 @@ private:
 			throw std::runtime_error("failed to flip swap chain image!");
 	}
 
-	void updateUniformBuffer()
+	void updateUniformBuffers()
 	{
+		UniformBufferObject* data;
+		CHECK_VK(vmaMapMemory(myAllocator, myUniformBufferMemory, (void**)&data));
+
 		static auto start = std::chrono::high_resolution_clock::now();
 		auto now = std::chrono::high_resolution_clock::now();
 		constexpr float period = 10.0;
 		float t = std::chrono::duration<float>(now - start).count();
-		float tp = fmod(t, period);
-		float s = smootherstep(
-			smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
-		glm::mat4 model = glm::rotate(
-			glm::translate(
-				glm::mat4(1),
-				glm::vec3(0, 0, -0.01f - std::numeric_limits<float>::epsilon())),
-			s * glm::radians(360.0f),
-			glm::vec3(0.0, 0.0, 1.0));
+		for (uint32_t n = 0; n < (NX * NY); n++)
+		{
+			UniformBufferObject& ubo = data[n];				
 
-		glm::mat4 view0 = glm::mat4(1);
-		glm::mat4 proj0 = glm::frustum(-1.0, 1.0, -1.0, 1.0, 0.01, 10.0);
+			float tp = fmod((0.003f * n) + t, period);
+			float s = smootherstep(
+				smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
-		glm::mat4 view1 = glm::lookAt(glm::vec3(1.5f, 1.5f, 1.0f), glm::vec3(0.0f, 0.0f, -0.5f), glm::vec3(0.0f, 0.0f, -1.0f));
-		glm::mat4 proj1 = glm::perspective(glm::radians(75.0f), myWindowData->Width / static_cast<float>(myWindowData->Height), 0.01f, 10.0f);
+			glm::mat4 model = glm::rotate(
+				glm::translate(
+					glm::mat4(1),
+					glm::vec3(0, 0, -0.01f - std::numeric_limits<float>::epsilon())),
+				s * glm::radians(360.0f),
+				glm::vec3(0.0, 0.0, 1.0));
 
-		UniformBufferObject ubo = {};
-		ubo.model = model;
-		ubo.view = glm::mat4(
-			lerp(view0[0], view1[0], s),
-			lerp(view0[1], view1[1], s),
-			lerp(view0[2], view1[2], s),
-			lerp(view0[3], view1[3], s));
-		ubo.proj = glm::mat4(
-			lerp(proj0[0], proj1[0], s),
-			lerp(proj0[1], proj1[1], s),
-			lerp(proj0[2], proj1[2], s),
-			lerp(proj0[3], proj1[3], s));
+			glm::mat4 view0 = glm::mat4(1);
+			glm::mat4 proj0 = glm::frustum(-1.0, 1.0, -1.0, 1.0, 0.01, 10.0);
+
+			glm::mat4 view1 = 
+				glm::lookAt(
+					glm::vec3(1.5f, 1.5f, 1.0f),
+					glm::vec3(0.0f, 0.0f, -0.5f),
+					glm::vec3(0.0f, 0.0f, -1.0f));
+			glm::mat4 proj1 = 
+				glm::perspective(
+					glm::radians(75.0f),
+					myWindowData->Width / static_cast<float>(myWindowData->Height),
+					0.01f,
+					10.0f);
+
+			ubo.model = model;
+			ubo.view = glm::mat4(
+				lerp(view0[0], view1[0], s),
+				lerp(view0[1], view1[1], s),
+				lerp(view0[2], view1[2], s),
+				lerp(view0[3], view1[3], s));
+			ubo.proj = glm::mat4(
+				lerp(proj0[0], proj1[0], s),
+				lerp(proj0[1], proj1[1], s),
+				lerp(proj0[2], proj1[2], s),
+				lerp(proj0[3], proj1[3], s));
+
+			vmaFlushAllocation(
+				myAllocator,
+				myUniformBufferMemory,
+				n * sizeof(UniformBufferObject),
+				sizeof(UniformBufferObject));
+		}
 		
-		void* data;
-		CHECK_VK(vmaMapMemory(myAllocator, myUniformBufferMemory, &data));
-		memcpy(data, &ubo, sizeof(ubo));
 		vmaUnmapMemory(myAllocator, myUniformBufferMemory);
 	}
 
@@ -1365,10 +1388,22 @@ private:
 			CHECK_VK(myDeviceTable.vkResetFences(myDevice, 1, &newFrame->Fence));
 		}
 
+		// setup draw parameters
+		uint32_t dx = myWindowData->Width / NX;
+		uint32_t dy = myWindowData->Height / NY;
+
+		constexpr uint32_t drawCount = NX * NY;
+		uint32_t segmentCount = std::max(myCommandBufferCount - 1u, 1u);
+		uint32_t segmentDrawCount = drawCount / segmentCount;
+
+		if (drawCount % segmentCount)
+			segmentDrawCount += 1;
+
 		// begin secondary command buffers
-		for (uint32_t cmdIt = 1; cmdIt < myCommandListCount; cmdIt++)
+		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + cmdIt];
+			VkCommandBuffer& cmd =
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
 
 			VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 			inherit.renderPass = myRenderPass;
@@ -1384,31 +1419,16 @@ private:
 			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
 
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, myGraphicsPipeline);
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				myPipelineLayout, 0, 1, &myDescriptorSet, 0, nullptr);
 			
 			VkBuffer vertexBuffers[] = { myVertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
+			VkDeviceSize vertexOffsets[] = { 0 };
 
-			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, vertexOffsets);
 			vkCmdBindIndexBuffer(cmd, myIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 		}
 
 		// draw spinning logos using secondary command buffers
 		{
-			static uint32_t nx = 16;
-			static uint32_t ny = 9;
-
-			uint32_t dx = myWindowData->Width / nx;
-			uint32_t dy = myWindowData->Height / ny;
-
-			uint32_t drawCount = nx * ny;
-			uint32_t segmentCount = std::max(myCommandListCount - 1u, 1u);
-			uint32_t segmentDrawCount = drawCount / segmentCount;
-
-			if (drawCount % segmentCount)
-				segmentDrawCount += 1;
-
 			std::array<uint32_t, 128> seq;
 			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
 			std::for_each_n(
@@ -1417,9 +1437,9 @@ private:
 			#endif
 				seq.begin(),
 				segmentCount,
-				[this, &dx, &dy, &drawCount, &segmentDrawCount](uint32_t segmentIt)
+				[this, &dx, &dy, &segmentDrawCount](uint32_t segmentIt)
 			{
-				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + (segmentIt + 1)];
+				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
 
 				for (uint32_t drawIt = 0; drawIt < segmentDrawCount; drawIt++)
 				{
@@ -1428,10 +1448,10 @@ private:
 					if (n >= drawCount)
 						break;
 
-					uint32_t i = n % nx;
-					uint32_t j = n / nx;
+					uint32_t i = n % NX;
+					uint32_t j = n / NX;
 
-					auto drawSpinningLogo = [](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height)
+					auto drawSpinningLogo = [this, &n](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height)
 					{
 						VkViewport viewport = {};
 						viewport.x = static_cast<float>(x);
@@ -1445,6 +1465,17 @@ private:
 						scissor.offset = { x, y };
 						scissor.extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
+						uint32_t uniformBufferOffset = n * sizeof(UniformBufferObject);
+						vkCmdBindDescriptorSets(
+							cmd,
+							VK_PIPELINE_BIND_POINT_GRAPHICS,
+							myPipelineLayout,
+							0,
+							1,
+							&myDescriptorSet,
+							1,
+							&uniformBufferOffset);
+
 						vkCmdSetViewport(cmd, 0, 1, &viewport);
 						vkCmdSetScissor(cmd, 0, 1, &scissor);
 						vkCmdDrawIndexed(cmd, static_cast<uint32_t>(sizeof_array(ourIndices)), 1, 0, 0, 0);
@@ -1455,9 +1486,10 @@ private:
 			});
 		}
 
-		for (uint32_t cmdIt = 1; cmdIt < myCommandListCount; cmdIt++)
+		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandListCount + cmdIt];
+			VkCommandBuffer& cmd =
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
 
 			CHECK_VK(vkEndCommandBuffer(cmd));
 		}
@@ -1484,8 +1516,8 @@ private:
 			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 			vkCmdExecuteCommands(newFrame->CommandBuffer,
-				(myCommandListCount - 1),
-				&myCommandBuffers[(myWindowData->FrameIndex * myCommandListCount) + 1]);
+				(myCommandBufferCount - 1),
+				&myCommandBuffers[(myWindowData->FrameIndex * myCommandBufferCount) + 1]);
 
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
@@ -1549,11 +1581,11 @@ private:
 				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[bufferIt], nullptr);
 			}
 
-			for (uint32_t cmdIt = 0; cmdIt < myCommandListCount; cmdIt++)
+			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+			for (uint32_t cmdIt = 0; cmdIt < myCommandBufferCount; cmdIt++)
 			{
-				std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
 				for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandListCount * bufferIt + cmdIt];
+					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandBufferCount * bufferIt + cmdIt];
 
 				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myBufferCount, threadCommandBuffers.data());
 				vkDestroyCommandPool(myDevice, myCommandPools[cmdIt], nullptr);
@@ -1606,6 +1638,7 @@ private:
 		glm::mat4 model;
 		glm::mat4 view;
 		glm::mat4 proj;
+		glm::mat4 pad;
 	};
 
 	struct SimpleVertex2D
@@ -1689,7 +1722,10 @@ private:
 	const std::string myResourcePath;
 
 	uint32_t myBufferCount = 0;
-	uint32_t myCommandListCount = 0;
+	uint32_t myCommandBufferCount = 0;
+
+	static constexpr uint32_t NX = 16;
+	static constexpr uint32_t NY = 9;
 };
 
 const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
