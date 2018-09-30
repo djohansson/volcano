@@ -97,7 +97,7 @@ public:
 		{
 			int x, y, n;
 			unsigned char* data =
-				stbi_load((myResourcePath + std::string("images/Vulkan_500px_Dec16.png")).c_str(),
+				stbi_load((myResourcePath + std::string("images/2018-Vulkan-small-badge.png")).c_str(),
 					&x, &y, &n, STBI_rgb_alpha);
 
 			assert(data != nullptr);
@@ -665,7 +665,7 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateRenderPass(myDevice, &renderPassInfo, nullptr, &myRenderPass));
 	}
 
-	void createGraphicsPipeline()
+	void createGraphicsPipelines()
 	{
 		std::vector<char> vsCode;
 		readSPIRVFile((myResourcePath + std::string("shaders/spir-v/vert.spv")).c_str(), vsCode);
@@ -695,11 +695,32 @@ private:
 		VkShaderModule fsModule;
 		CHECK_VK(myDeviceTable.vkCreateShaderModule(myDevice, &fsCreateInfo, nullptr, &fsModule));
 
+		struct AlphaTestSpecializationData
+		{
+			uint32_t alphaTestMethod = 0;
+			float alphaTestRef = 0.5f;
+		} alphaTestSpecializationData;
+
+		std::array<VkSpecializationMapEntry, 2> alphaTestSpecializationMapEntries;
+		alphaTestSpecializationMapEntries[0].constantID = 0;
+		alphaTestSpecializationMapEntries[0].size = sizeof(alphaTestSpecializationData.alphaTestMethod);
+		alphaTestSpecializationMapEntries[0].offset = 0;
+		alphaTestSpecializationMapEntries[1].constantID = 1;
+		alphaTestSpecializationMapEntries[1].size = sizeof(alphaTestSpecializationData.alphaTestRef);
+		alphaTestSpecializationMapEntries[1].offset = offsetof(AlphaTestSpecializationData, alphaTestRef);
+
+		VkSpecializationInfo alphaTestSpecializationInfo = {};
+		alphaTestSpecializationInfo.dataSize = sizeof(alphaTestSpecializationData);
+		alphaTestSpecializationInfo.mapEntryCount = static_cast<uint32_t>(alphaTestSpecializationMapEntries.size());
+		alphaTestSpecializationInfo.pMapEntries = alphaTestSpecializationMapEntries.data();
+		alphaTestSpecializationInfo.pData = &alphaTestSpecializationData;
+
 		VkPipelineShaderStageCreateInfo fsStageInfo = {};
 		fsStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		fsStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 		fsStageInfo.module = fsModule;
 		fsStageInfo.pName = "main";
+		fsStageInfo.pSpecializationInfo = &alphaTestSpecializationInfo;
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = { vsStageInfo, fsStageInfo };
 
@@ -828,8 +849,23 @@ private:
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1;
 
-		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(myDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-			&myGraphicsPipeline));
+		alphaTestSpecializationData.alphaTestMethod = 0;
+		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(
+			myDevice,
+			VK_NULL_HANDLE,
+			1,
+			&pipelineInfo,
+			nullptr,
+			&myGraphicsPipelines.data[GraphicsPipelines::NoAlphaTest]));
+
+		alphaTestSpecializationData.alphaTestMethod = 1;
+		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(
+			myDevice,
+			VK_NULL_HANDLE,
+			1,
+			&pipelineInfo,
+			nullptr,
+			&myGraphicsPipelines.data[GraphicsPipelines::AlphaTest]));
 
 		myDeviceTable.vkDestroyShaderModule(myDevice, vsModule, nullptr);
 		myDeviceTable.vkDestroyShaderModule(myDevice, fsModule, nullptr);
@@ -1276,7 +1312,7 @@ private:
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 		createRenderPass();
-		createGraphicsPipeline();
+		createGraphicsPipelines();
 	}
 
 	void checkFlipOrPresentResult(VkResult result)
@@ -1305,7 +1341,7 @@ private:
 		{
 			UniformBufferObject& ubo = data[n];				
 
-			float tp = fmod((0.003f * n) + t, period);
+			float tp = fmod((0.0025f * n) + t, period);
 			float s = smootherstep(
 				smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
@@ -1418,7 +1454,10 @@ private:
 			secBeginInfo.pInheritanceInfo = &inherit;
 			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
 
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, myGraphicsPipeline);
+			vkCmdBindPipeline(
+				cmd,
+				VK_PIPELINE_BIND_POINT_GRAPHICS,
+				myGraphicsPipelines.data[segmentIt & 1]);
 			
 			VkBuffer vertexBuffers[] = { myVertexBuffer };
 			VkDeviceSize vertexOffsets[] = { 0 };
@@ -1597,7 +1636,9 @@ private:
 		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
 		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
 
-		myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
+		for (uint32_t pipelineIt = 0; pipelineIt < GraphicsPipelines::Count; pipelineIt++)
+			myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipelines.data[pipelineIt], nullptr);
+		
 		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
 		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
 	}
@@ -1694,7 +1735,18 @@ private:
 	VkDescriptorSet myDescriptorSet = VK_NULL_HANDLE;
 	VkRenderPass myRenderPass = VK_NULL_HANDLE;
 	VkPipelineLayout myPipelineLayout = VK_NULL_HANDLE;
-	VkPipeline myGraphicsPipeline = VK_NULL_HANDLE;
+	struct GraphicsPipelines
+	{
+		enum
+		{
+			NoAlphaTest,
+			AlphaTest,
+
+			Count
+		};
+
+		VkPipeline data[Count] = { VK_NULL_HANDLE };
+	} myGraphicsPipelines;
 	VkBuffer myVertexBuffer = VK_NULL_HANDLE;
 	VmaAllocation myVertexBufferMemory = VK_NULL_HANDLE;
 	VkBuffer myIndexBuffer = VK_NULL_HANDLE;
