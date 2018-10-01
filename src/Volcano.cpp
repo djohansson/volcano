@@ -69,7 +69,8 @@ class VulkanApplication
 public:
 	VulkanApplication(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
-		, myCommandBufferCount(std::thread::hardware_concurrency())
+		, myCommandBufferThreadCount(clamp(4, 2, 32))
+		, myRequestedCommandBufferThreadCount(myCommandBufferThreadCount)
 	{
 		createInstance();
 		createDebugCallback();
@@ -135,42 +136,60 @@ public:
 
 	void draw()
 	{
-		ImGui_ImplVulkan_NewFrame();
-		ImGui::NewFrame();
-
-		ImGui::ShowDemoWindow();
-
+		// todo: route all events that needs frame resource re-creation here
+		if (myCommandBufferThreadCount != myRequestedCommandBufferThreadCount)
 		{
-			ImGui::Begin("Render Options");
-			ImGui::ColorEdit3("Clear Color", &myWindowData->ClearValue.color.float32[0]);
-			ImGui::End();
+			CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+		
+			cleanupFrameResources();
+
+			myCommandBufferThreadCount = myRequestedCommandBufferThreadCount;
+
+			createFrameResources(myWindowData->Width, myWindowData->Height);
 		}
 
+		// todo: run this at the same time as secondary command buffer recording
 		{
-			ImGui::Begin("GUI Options");
-			static int styleIndex = 0;
-			ImGui::ShowStyleSelector("Styles", &styleIndex);
-			ImGui::ShowFontSelector("Fonts");
-			if (ImGui::Button("Show User Guide"))
+			ImGui_ImplVulkan_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::ShowDemoWindow();
+
 			{
-				ImGui::SetNextWindowPosCenter();
-				ImGui::OpenPopup("UserGuide");
+				ImGui::Begin("Render Options");
+				ImGui::DragInt("Command Buffer Threads", &myRequestedCommandBufferThreadCount, 0.1f, 2, 32);
+				ImGui::ColorEdit3("Clear Color", &myWindowData->ClearValue.color.float32[0]);
+				ImGui::End();
 			}
-			if (ImGui::BeginPopup("UserGuide", ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+
 			{
-				ImGui::ShowUserGuide();
-				ImGui::EndPopup();
+				ImGui::Begin("GUI Options");
+				static int styleIndex = 0;
+				ImGui::ShowStyleSelector("Styles", &styleIndex);
+				ImGui::ShowFontSelector("Fonts");
+				if (ImGui::Button("Show User Guide"))
+				{
+					ImGui::SetNextWindowPosCenter();
+					ImGui::OpenPopup("UserGuide");
+				}
+				if (ImGui::BeginPopup("UserGuide", ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+				{
+					ImGui::ShowUserGuide();
+					ImGui::EndPopup();
+				}
+				ImGui::End();
 			}
-			ImGui::End();
+
+			{
+				ImGui::ShowMetricsWindow();
+			}
+
+			ImGui::Render();
 		}
 
-		{
-			ImGui::ShowMetricsWindow();
-		}
-
-		ImGui::Render();
-
+		// todo: run this at the same time as secondary command buffer recording
 		updateUniformBuffers();
+
 		submitFrame();
 		presentFrame();
 	}
@@ -1255,15 +1274,15 @@ private:
 
 		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-		myCommandPools.resize(myCommandBufferCount);
-		myCommandBuffers.resize(myCommandBufferCount * myBufferCount);
+		myCommandPools.resize(myCommandBufferThreadCount);
+		myCommandBuffers.resize(myCommandBufferThreadCount * myBufferCount);
 
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
 
 		std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
-		for (uint32_t cmdIt = 0; cmdIt < myCommandBufferCount; cmdIt++)
+		for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
 		{
 			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
@@ -1278,7 +1297,7 @@ private:
 			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
 
 			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-				myCommandBuffers[myCommandBufferCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
+				myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
 		}
 
 		myFrameFences.resize(myBufferCount);
@@ -1298,7 +1317,7 @@ private:
 			// IMGUI uses primary command buffer only
 			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
 			fd->CommandPool = myCommandPools[0];
-			fd->CommandBuffer = myCommandBuffers[myCommandBufferCount * bufferIt];
+			fd->CommandBuffer = myCommandBuffers[myCommandBufferThreadCount * bufferIt];
 			fd->Fence = myFrameFences[bufferIt];
 			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
 			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
@@ -1429,7 +1448,7 @@ private:
 		uint32_t dy = myWindowData->Height / NY;
 
 		constexpr uint32_t drawCount = NX * NY;
-		uint32_t segmentCount = std::max(myCommandBufferCount - 1u, 1u);
+		uint32_t segmentCount = std::max(myCommandBufferThreadCount - 1u, 1u);
 		uint32_t segmentDrawCount = drawCount / segmentCount;
 
 		if (drawCount % segmentCount)
@@ -1439,7 +1458,7 @@ private:
 		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
 			VkCommandBuffer& cmd =
-				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 			VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 			inherit.renderPass = myRenderPass;
@@ -1478,7 +1497,7 @@ private:
 				segmentCount,
 				[this, &dx, &dy, &segmentDrawCount](uint32_t segmentIt)
 			{
-				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
+				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 				for (uint32_t drawIt = 0; drawIt < segmentDrawCount; drawIt++)
 				{
@@ -1528,7 +1547,7 @@ private:
 		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
 			VkCommandBuffer& cmd =
-				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferCount + (segmentIt + 1)];
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 			CHECK_VK(vkEndCommandBuffer(cmd));
 		}
@@ -1555,8 +1574,8 @@ private:
 			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 			vkCmdExecuteCommands(newFrame->CommandBuffer,
-				(myCommandBufferCount - 1),
-				&myCommandBuffers[(myWindowData->FrameIndex * myCommandBufferCount) + 1]);
+				(myCommandBufferThreadCount - 1),
+				&myCommandBuffers[(myWindowData->FrameIndex * myCommandBufferThreadCount) + 1]);
 
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
@@ -1621,10 +1640,10 @@ private:
 			}
 
 			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
-			for (uint32_t cmdIt = 0; cmdIt < myCommandBufferCount; cmdIt++)
+			for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
 			{
 				for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandBufferCount * bufferIt + cmdIt];
+					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt];
 
 				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myBufferCount, threadCommandBuffers.data());
 				vkDestroyCommandPool(myDevice, myCommandPools[cmdIt], nullptr);
@@ -1774,7 +1793,8 @@ private:
 	const std::string myResourcePath;
 
 	uint32_t myBufferCount = 0;
-	uint32_t myCommandBufferCount = 0;
+	uint32_t myCommandBufferThreadCount = 0;
+	int myRequestedCommandBufferThreadCount = 0;
 
 	static constexpr uint32_t NX = 16;
 	static constexpr uint32_t NY = 9;

@@ -64,8 +64,13 @@
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
-			"externalConsole": true,
-			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
 		},
 		{
 			"name": "(Windows) Launch Profile",
@@ -76,8 +81,13 @@
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
-			"externalConsole": true,
-			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
 		},
 		{
 			"name": "(Windows) Launch Release",
@@ -88,8 +98,13 @@
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
-			"externalConsole": true,
-			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
 		}
 	]
 }

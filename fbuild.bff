@@ -122,7 +122,7 @@ Compiler('Compiler-Clang')
 		+ .CompilerDebugOptimizations
 	.LibrarianOptions + .LibrarianDebugOptimizations
 	.LinkerOptions + .LinkerDebugOptimizations
-#if __WINDOWS__  // apparently this is neded for debug builds
+#if __WINDOWS__
 		+ ' -lmsvcrtd'
 #endif //__WINDOWS__
 ]
@@ -133,6 +133,9 @@ Compiler('Compiler-Clang')
 		+ .CompilerReleaseOptimizations
 	.LibrarianOptions + .LibrarianReleaseOptimizations
 	.LinkerOptions + .LinkerReleaseOptimizations
+#if __WINDOWS__
+		+ ' -lmsvcrt'
+#endif //__WINDOWS__
 ]
 .Clang_x64_ProfileConfig = [
 	Using(.Clang_x64_ReleaseConfig)
@@ -166,13 +169,13 @@ Compiler('Compiler-Clang')
 				+ ' -I$ProjectPath$../imgui'
 				+ ' -I$ProjectPath$../glfw/include'
 				+ ' -DVOLCANO_USE_GLFW'
-#if __WINDOWS__ // to avoid errors in windows headers
+	#if __WINDOWS__ // to avoid errors in windows headers
 				+ ' -Wno-expansion-to-defined'
 				+ ' -Wno-nonportable-include-path'
 				+ ' -Wno-deprecated-declarations'
-#else
+	#else
 				+ ' -Wno-unused-variable'
-#endif //__WINDOWS__
+	#endif //__WINDOWS__
 		ObjectList('$ProjectName$-Lib-$Config$')
 		{
 			// todo: make separate ObjectLists depending on source file type
@@ -186,7 +189,12 @@ Compiler('Compiler-Clang')
 			}
 			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
 		}
-		Executable("$ProjectName$'-'$Config$")
+	#if __WINDOWS__ // but whyyyyyyyyy?
+		.ExecutableName = "$ProjectName$-$Config$";
+	#else
+		.ExecutableName = "$ProjectName$'-'$Config$";
+	#endif
+		Executable('$ExecutableName$')
 		{
 			.Libraries = { '$ProjectName$-Lib-$Config$' }
 		#if __WINDOWS__
