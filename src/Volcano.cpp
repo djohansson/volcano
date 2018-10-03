@@ -1656,7 +1656,11 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 	assert(theApp == nullptr);
 
 	static const char* DISABLE_VK_LAYER_VALVE_steam_overlay_1 = "DISABLE_VK_LAYER_VALVE_steam_overlay_1=1";
+#if defined(_WIN32)
 	_putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
+#else
+	putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
+#endif
 
 	if (verbose)
 	{
