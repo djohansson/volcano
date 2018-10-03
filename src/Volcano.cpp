@@ -7,7 +7,6 @@
 
 #if defined(VOLCANO_USE_GLFW)
 #	define GLFW_INCLUDE_NONE
-#	define GLFW_INCLUDE_VULKAN
 #	include <GLFW/glfw3.h>
 #endif
 
@@ -15,7 +14,6 @@
 #	define NOMINMAX
 #	include <wtypes.h>
 #	include <vulkan/vulkan_win32.h>
-#	include <ppl.h>
 #elif defined(__APPLE__)
 #	include <vulkan/vulkan_macos.h>
 #elif defined(__linux__)
@@ -49,28 +47,46 @@
 #include <imgui.h>
 #include <examples/imgui_impl_vulkan.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#ifndef __APPLE__
+#include <execution>
+#endif
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 
 
 class VulkanApplication
 {
 public:
-	VulkanApplication(void* view, int width, int height, const char* resourcePath, bool /*verbose*/)
+	VulkanApplication(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool /*verbose*/)
 		: myResourcePath(resourcePath)
-		//, myVerboseFlag(verbose)
+		, myCommandBufferThreadCount(clamp(4, 2, 32))
+		, myRequestedCommandBufferThreadCount(myCommandBufferThreadCount)
 	{
-		VkSurfaceKHR surface = VK_NULL_HANDLE;
-		initVulkan(view, width, height, surface);
-		initIMGUI(height, width, surface);
+		createInstance();
+		createDebugCallback();
 		
+		createSurface(view);
+		createDevice();
+
+		createAllocator();
+
+		createTextureSampler();
+
+		createDescriptorPool();
+		createDescriptorSetLayout();
+
+		createFrameResources(framebufferWidth, framebufferHeight);
+
 		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
 			myVertexBufferMemory);
@@ -82,7 +98,7 @@ public:
 		{
 			int x, y, n;
 			unsigned char* data =
-				stbi_load((myResourcePath + std::string("images/Vulkan_500px_Dec16.png")).c_str(),
+				stbi_load((myResourcePath + std::string("images/2018-Vulkan-small-badge.png")).c_str(),
 					&x, &y, &n, STBI_rgb_alpha);
 
 			assert(data != nullptr);
@@ -96,68 +112,95 @@ public:
 		}
 
 		// create uniform buffer
-		createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			myUniformBuffer, myUniformBufferMemory);
-
-		// create pipeline and descriptors
-		createTextureSampler();
-		createDescriptorSetLayout();
+		createBuffer(
+			NX * NY * sizeof(UniformBufferObject),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+			myUniformBuffer,
+			myUniformBufferMemory);
+		
 		createDescriptorSet();
-		createRenderPass();
-		createGraphicsPipeline();
+
+		float dpiScaleX = static_cast<float>(framebufferWidth) / windowWidth;
+		float dpiScaleY = static_cast<float>(framebufferHeight) / windowHeight;
+
+		initIMGUI(dpiScaleX, dpiScaleY);
 	}
 
 	~VulkanApplication()
 	{
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+
 		cleanup();
 	}
 
 	void draw()
 	{
-		ImGui_ImplVulkan_NewFrame();
-		ImGui::NewFrame();
-
-		ImGui::ShowDemoWindow();
-
+		// todo: route all events that needs frame resource re-creation here
+		if (myCommandBufferThreadCount != myRequestedCommandBufferThreadCount)
 		{
-			ImGui::Begin("Render Options");
-			ImGui::ColorEdit3("Clear Color", &myWindowData->ClearValue.color.float32[0]);
-			ImGui::End();
+			CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+		
+			cleanupFrameResources();
+
+			myCommandBufferThreadCount = myRequestedCommandBufferThreadCount;
+
+			createFrameResources(myWindowData->Width, myWindowData->Height);
 		}
 
+		// todo: run this at the same time as secondary command buffer recording
 		{
-			ImGui::Begin("GUI Options");
-			static int styleIndex = 0;
-			ImGui::ShowStyleSelector("Styles", &styleIndex);
-			ImGui::ShowFontSelector("Fonts");
-			if (ImGui::Button("Show User Guide"))
+			ImGui_ImplVulkan_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::ShowDemoWindow();
+
 			{
-				ImGui::SetNextWindowPosCenter();
-				ImGui::OpenPopup("UserGuide");
+				ImGui::Begin("Render Options");
+				ImGui::DragInt("Command Buffer Threads", &myRequestedCommandBufferThreadCount, 0.1f, 2, 32);
+				ImGui::ColorEdit3("Clear Color", &myWindowData->ClearValue.color.float32[0]);
+				ImGui::End();
 			}
-			if (ImGui::BeginPopup("UserGuide", ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+
 			{
-				ImGui::ShowUserGuide();
-				ImGui::EndPopup();
+				ImGui::Begin("GUI Options");
+				static int styleIndex = 0;
+				ImGui::ShowStyleSelector("Styles", &styleIndex);
+				ImGui::ShowFontSelector("Fonts");
+				if (ImGui::Button("Show User Guide"))
+				{
+					ImGui::SetNextWindowPosCenter();
+					ImGui::OpenPopup("UserGuide");
+				}
+				if (ImGui::BeginPopup("UserGuide", ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+				{
+					ImGui::ShowUserGuide();
+					ImGui::EndPopup();
+				}
+				ImGui::End();
 			}
-			ImGui::End();
+
+			{
+				ImGui::ShowMetricsWindow();
+			}
+
+			ImGui::Render();
 		}
 
-		{
-			ImGui::ShowMetricsWindow();
-		}
+		// todo: run this at the same time as secondary command buffer recording
+		updateUniformBuffers();
 
-		ImGui::Render();
-
-		updateUniformBuffer();
 		submitFrame();
 		presentFrame();
 	}
 
-	void resize(int /*width*/, int /*height*/)
+	void resize(int width, int height)
 	{
-		// todo
+		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
+		
+		cleanupFrameResources();
+
+		createFrameResources(width, height);
 	}
 
 private:
@@ -266,11 +309,11 @@ private:
 			&myDebugCallback));
 	}
 
-	void createSurface(void* view, VkSurfaceKHR& outSurface)
+	void createSurface(void* view)
 	{
 #if defined(VOLCANO_USE_GLFW)
 		CHECK_VK(glfwCreateWindowSurface(myInstance, reinterpret_cast<GLFWwindow*>(view), nullptr,
-			&outSurface));
+			&mySurface));
 #elif defined(_WIN32)
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -280,7 +323,7 @@ private:
 		auto vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(
 			myInstance, "vkCreateWin32SurfaceKHR");
 		assert(vkCreateWin32SurfaceKHR != nullptr);
-		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateWin32SurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #elif defined(__APPLE__)
 		VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
@@ -289,7 +332,7 @@ private:
 		auto vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr(
 			myInstance, "vkCreateMacOSSurfaceMVK");
 		assert(vkCreateMacOSSurfaceMVK != nullptr);
-		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateMacOSSurfaceMVK(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #elif defined(__linux__)
 #	if defined(VK_USE_PLATFORM_XCB_KHR)
 		VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
@@ -300,7 +343,7 @@ private:
 		auto vkCreateXcbSurfaceKHR =
 			(PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXcbSurfaceKHR");
 		assert(vkCreateXcbSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateXcbSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	elif defined(VK_USE_PLATFORM_XLIB_KHR)
 		VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -310,7 +353,7 @@ private:
 		auto vkCreateXlibSurfaceKHR =
 			(PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(myInstance, "vkCreateXlibSurfaceKHR");
 		assert(vkCreateXlibSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateXlibSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 		VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo = {};
 		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
@@ -320,12 +363,12 @@ private:
 		auto vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vkGetInstanceProcAddr(
 			myInstance, "vkCreateWaylandSurfaceKHR");
 		assert(vkCreateWaylandSurfaceKHR != nullptr);
-		CHECK_VK(vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &outSurface));
+		CHECK_VK(vkCreateWaylandSurfaceKHR(myInstance, &surfaceCreateInfo, nullptr, &mySurface));
 #	endif
 #endif
 	}
 
-	void createDevice(VkSurfaceKHR surface)
+	void createDevice()
 	{
 		uint32_t deviceCount = 0;
 		CHECK_VK(vkEnumeratePhysicalDevices(myInstance, &deviceCount, nullptr));
@@ -337,10 +380,59 @@ private:
 
 		for (const auto& device : devices)
 		{
-			myQueueFamilyIndex = isDeviceSuitable(surface, device);
+			SwapChainInfo swapChain;
+			myQueueFamilyIndex = isDeviceSuitable(mySurface, device, swapChain);
 			if (myQueueFamilyIndex >= 0)
 			{
 				myPhysicalDevice = device;
+
+				const VkFormat requestSurfaceImageFormat[] =
+				{
+					VK_FORMAT_B8G8R8A8_UNORM,
+					VK_FORMAT_R8G8B8A8_UNORM,
+					VK_FORMAT_B8G8R8_UNORM,
+					VK_FORMAT_R8G8B8_UNORM
+				};
+				const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+				const VkPresentModeKHR requestPresentMode[] =
+				{
+					VK_PRESENT_MODE_MAILBOX_KHR,
+					VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+					VK_PRESENT_MODE_FIFO_KHR,
+					VK_PRESENT_MODE_IMMEDIATE_KHR
+				};
+
+				// Request several formats, the first found will be used 
+				// If none of the requested image formats could be found, use the first available
+				mySurfaceFormat = swapChain.formats[0];
+				for (uint32_t request_i = 0; request_i < sizeof_array(requestSurfaceImageFormat); request_i++)
+				{
+					VkSurfaceFormatKHR requestedFormat = { requestSurfaceImageFormat[request_i], requestSurfaceColorSpace };
+					auto formatIt = std::find(swapChain.formats.begin(), swapChain.formats.end(), requestedFormat);
+					if (formatIt != swapChain.formats.end())
+					{
+						mySurfaceFormat = *formatIt;
+						break;
+					}
+				}
+
+				// Request a certain mode and confirm that it is available. If not use VK_PRESENT_MODE_FIFO_KHR which is mandatory
+				myPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+				myBufferCount = 2;
+				for (uint32_t request_i = 0; request_i < sizeof_array(requestPresentMode); request_i++)
+				{
+					auto modeIt = std::find(swapChain.presentModes.begin(), swapChain.presentModes.end(), requestPresentMode[request_i]);
+					if (modeIt != swapChain.presentModes.end())
+					{
+						myPresentMode = *modeIt;
+						
+						if (myPresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+							myBufferCount = 3;
+
+						break;
+					}
+				}
+
 				break;
 			}
 		}
@@ -367,7 +459,8 @@ private:
 		vkEnumerateDeviceExtensionProperties(myPhysicalDevice, nullptr, &deviceExtensionCount,
 			availableDeviceExtensions.data());
 
-		std::vector<const char*> deviceExtensions(deviceExtensionCount);
+		std::vector<const char*> deviceExtensions;
+        deviceExtensions.reserve(deviceExtensionCount);
 		for (uint32_t i = 0; i < deviceExtensionCount; i++)
 		{
 #if defined(__APPLE__)
@@ -376,8 +469,8 @@ private:
 				strcmp(availableDeviceExtensions[i].extensionName, "VK_MVK_macos_surface") == 0)
 				continue;
 #endif
-			deviceExtensions[i] = availableDeviceExtensions[i].extensionName;
-			std::cout << deviceExtensions[i] << "\n";
+			deviceExtensions.push_back(availableDeviceExtensions[i].extensionName);
+			std::cout << deviceExtensions.back() << "\n";
 		}
 
 		std::sort(deviceExtensions.begin(), deviceExtensions.end(),
@@ -440,22 +533,24 @@ private:
 	void createDescriptorPool()
 	{
 		constexpr uint32_t maxDescriptorCount = 1000;
-		VkDescriptorPoolSize poolSizes[] = {
-			{VK_DESCRIPTOR_TYPE_SAMPLER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, maxDescriptorCount},
-			{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, maxDescriptorCount} };
+		VkDescriptorPoolSize poolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, maxDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, maxDescriptorCount }
+		};
 
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = (uint32_t)sizeof_array(poolSizes);
+		poolInfo.poolSizeCount = static_cast<uint32_t>(sizeof_array(poolSizes));
 		poolInfo.pPoolSizes = poolSizes;
 		poolInfo.maxSets = maxDescriptorCount * static_cast<uint32_t>(sizeof_array(poolSizes));
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -463,32 +558,11 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateDescriptorPool(myDevice, &poolInfo, nullptr, &myDescriptorPool));
 	}
 
-	void createDepthResources(int height, int width)
-	{
-		myDepthFormat = findSupportedFormat(
-			myPhysicalDevice,
-			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-		createImage2D(
-			width,
-			height,
-			myDepthFormat,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			myDepthImage,
-			myDepthImageMemory);
-
-		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-	}
-
 	void createDescriptorSetLayout()
 	{
 		VkDescriptorSetLayoutBinding uboLayoutBinding = {};
 		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		uboLayoutBinding.descriptorCount = 1;
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
@@ -526,7 +600,7 @@ private:
 		VkDescriptorBufferInfo bufferInfo = {};
 		bufferInfo.buffer = myUniformBuffer;
 		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(UniformBufferObject);
+		bufferInfo.range = VK_WHOLE_SIZE;
 
 		VkDescriptorImageInfo imageInfo = {};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -538,7 +612,7 @@ private:
 		descriptorWrites[0].dstSet = myDescriptorSet;
 		descriptorWrites[0].dstBinding = 0;
 		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		descriptorWrites[0].descriptorCount = 1;
 		descriptorWrites[0].pBufferInfo = &bufferInfo;
 		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -610,7 +684,7 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateRenderPass(myDevice, &renderPassInfo, nullptr, &myRenderPass));
 	}
 
-	void createGraphicsPipeline()
+	void createGraphicsPipelines()
 	{
 		std::vector<char> vsCode;
 		readSPIRVFile((myResourcePath + std::string("shaders/spir-v/vert.spv")).c_str(), vsCode);
@@ -640,11 +714,32 @@ private:
 		VkShaderModule fsModule;
 		CHECK_VK(myDeviceTable.vkCreateShaderModule(myDevice, &fsCreateInfo, nullptr, &fsModule));
 
+		struct AlphaTestSpecializationData
+		{
+			uint32_t alphaTestMethod = 0;
+			float alphaTestRef = 0.5f;
+		} alphaTestSpecializationData;
+
+		std::array<VkSpecializationMapEntry, 2> alphaTestSpecializationMapEntries;
+		alphaTestSpecializationMapEntries[0].constantID = 0;
+		alphaTestSpecializationMapEntries[0].size = sizeof(alphaTestSpecializationData.alphaTestMethod);
+		alphaTestSpecializationMapEntries[0].offset = 0;
+		alphaTestSpecializationMapEntries[1].constantID = 1;
+		alphaTestSpecializationMapEntries[1].size = sizeof(alphaTestSpecializationData.alphaTestRef);
+		alphaTestSpecializationMapEntries[1].offset = offsetof(AlphaTestSpecializationData, alphaTestRef);
+
+		VkSpecializationInfo alphaTestSpecializationInfo = {};
+		alphaTestSpecializationInfo.dataSize = sizeof(alphaTestSpecializationData);
+		alphaTestSpecializationInfo.mapEntryCount = static_cast<uint32_t>(alphaTestSpecializationMapEntries.size());
+		alphaTestSpecializationInfo.pMapEntries = alphaTestSpecializationMapEntries.data();
+		alphaTestSpecializationInfo.pData = &alphaTestSpecializationData;
+
 		VkPipelineShaderStageCreateInfo fsStageInfo = {};
 		fsStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		fsStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 		fsStageInfo.module = fsModule;
 		fsStageInfo.pName = "main";
+		fsStageInfo.pSpecializationInfo = &alphaTestSpecializationInfo;
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = { vsStageInfo, fsStageInfo };
 
@@ -773,8 +868,23 @@ private:
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1;
 
-		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(myDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-			&myGraphicsPipeline));
+		alphaTestSpecializationData.alphaTestMethod = 0;
+		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(
+			myDevice,
+			VK_NULL_HANDLE,
+			1,
+			&pipelineInfo,
+			nullptr,
+			&myGraphicsPipelines.data[GraphicsPipelines::NoAlphaTest]));
+
+		alphaTestSpecializationData.alphaTestMethod = 1;
+		CHECK_VK(myDeviceTable.vkCreateGraphicsPipelines(
+			myDevice,
+			VK_NULL_HANDLE,
+			1,
+			&pipelineInfo,
+			nullptr,
+			&myGraphicsPipelines.data[GraphicsPipelines::AlphaTest]));
 
 		myDeviceTable.vkDestroyShaderModule(myDevice, vsModule, nullptr);
 		myDeviceTable.vkDestroyShaderModule(myDevice, fsModule, nullptr);
@@ -1073,24 +1183,15 @@ private:
 		CHECK_VK(myDeviceTable.vkCreateSampler(myDevice, &samplerInfo, nullptr, &mySampler));
 	}
 
-	void initVulkan(void* window, int height, int width, VkSurfaceKHR& outSurface)
-	{
-		createInstance();
-		createDebugCallback();
-		createSurface(window, outSurface);
-		createDevice(outSurface);
-		createAllocator();
-		createDescriptorPool();
-		createDepthResources(width, height);
-	}
-
-	void initIMGUI(int height, int width, VkSurfaceKHR surface)
+	void initIMGUI(float dpiScaleX, float dpiScaleY)
 	{
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+		io.DisplayFramebufferScale = ImVec2(dpiScaleX, dpiScaleY);
 
 		ImFontConfig config;
 		config.OversampleH = 2;
@@ -1115,82 +1216,6 @@ private:
 		ImGui::StyleColorsClassic();
 		io.FontDefault = myFonts.back();
 
-		const VkFormat requestSurfaceImageFormat[] = {
-			VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM,
-			VK_FORMAT_R8G8B8_UNORM };
-		const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-		VkSurfaceFormatKHR surfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
-			myPhysicalDevice, surface, requestSurfaceImageFormat,
-			static_cast<uint32_t>(sizeof_array(requestSurfaceImageFormat)),
-			requestSurfaceColorSpace);
-
-		VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-		presentMode =
-			ImGui_ImplVulkanH_SelectPresentMode(myPhysicalDevice, surface, &presentMode, 1);
-
-		myBufferCount = presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2;
-
-		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(myBufferCount);
-
-		myWindowData->SurfaceFormat = surfaceFormat;
-		myWindowData->Surface = surface;
-		myWindowData->PresentMode = presentMode;
-
-		myWindowData->ClearEnable = false; // we will clear before IMGUI, using myWindowData->ClearValue
-		myWindowData->ClearValue.color.float32[0] = 0.4f;
-		myWindowData->ClearValue.color.float32[1] = 0.4f;
-		myWindowData->ClearValue.color.float32[2] = 0.5f;
-		myWindowData->ClearValue.color.float32[3] = 1.0f;
-
-		// Create SwapChain, RenderPass, Framebuffer, etc.
-		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
-			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
-		
-		myCommandPools.resize(myThreadCount);
-		myCommandBuffers.resize(myThreadCount * myBufferCount);
-		for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
-		{
-			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
-			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[threadIt]));
-			assert(myCommandPools[threadIt] != VK_NULL_HANDLE);
-
-			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
-			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-			cmdInfo.commandPool = myCommandPools[threadIt];
-			cmdInfo.level = threadIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-			cmdInfo.commandBufferCount = myBufferCount;
-			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
-
-			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-				myCommandBuffers[myThreadCount * bufferIt + threadIt] = threadCommandBuffers[bufferIt];
-		}
-
-		myFrameFences.resize(myBufferCount);
-		myImageAcquiredSemaphores.resize(myBufferCount);
-		myRenderCompleteSemaphores.resize(myBufferCount);
-
-		for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-		{
-			VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-			fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-			CHECK_VK(vkCreateFence(myDevice, &fenceInfo, nullptr, &myFrameFences[bufferIt]));
-
-			VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myImageAcquiredSemaphores[bufferIt]));
-			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myRenderCompleteSemaphores[bufferIt]));
-
-			// IMGUI uses primary command buffer only
-			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
-			fd->CommandPool = myCommandPools[0];
-			fd->CommandBuffer = myCommandBuffers[myThreadCount * bufferIt];
-			fd->Fence = myFrameFences[bufferIt];
-			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
-			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
-		}
-		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
-
 		// Setup Vulkan binding
 		ImGui_ImplVulkan_InitInfo initInfo = {};
 		initInfo.Instance = myInstance;
@@ -1212,6 +1237,92 @@ private:
 			endSingleTimeCommands(commandBuffer);
 			ImGui_ImplVulkan_InvalidateFontUploadObjects();
 		}
+	}
+
+	void createFrameResources(int width, int height)
+	{
+		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(myBufferCount);
+
+		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
+		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
+
+		myWindowData->SurfaceFormat = mySurfaceFormat;
+		myWindowData->Surface = mySurface;
+		myWindowData->PresentMode = myPresentMode;
+
+		myWindowData->ClearEnable = false; // we will clear before IMGUI, using myWindowData->ClearValue
+		myWindowData->ClearValue.color.float32[0] = 0.4f;
+		myWindowData->ClearValue.color.float32[1] = 0.4f;
+		myWindowData->ClearValue.color.float32[2] = 0.5f;
+		myWindowData->ClearValue.color.float32[3] = 1.0f;
+
+		myDepthFormat = findSupportedFormat(
+			myPhysicalDevice,
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+		createImage2D(
+			width,
+			height,
+			myDepthFormat,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			myDepthImage,
+			myDepthImageMemory);
+
+		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+		myCommandPools.resize(myCommandBufferThreadCount);
+		myCommandBuffers.resize(myCommandBufferThreadCount * myBufferCount);
+
+		// Create SwapChain, RenderPass, Framebuffer, etc.
+		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
+			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
+
+		std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+		for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
+		{
+			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+			cmdPoolInfo.queueFamilyIndex = myQueueFamilyIndex;
+			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			CHECK_VK(vkCreateCommandPool(myDevice, &cmdPoolInfo, nullptr, &myCommandPools[cmdIt]));
+			assert(myCommandPools[cmdIt] != VK_NULL_HANDLE);
+
+			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+			cmdInfo.commandPool = myCommandPools[cmdIt];
+			cmdInfo.level = cmdIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+			cmdInfo.commandBufferCount = myBufferCount;
+			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
+
+			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
+				myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
+		}
+
+		myFrameFences.resize(myBufferCount);
+		myImageAcquiredSemaphores.resize(myBufferCount);
+		myRenderCompleteSemaphores.resize(myBufferCount);
+
+		for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
+		{
+			VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+			fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+			CHECK_VK(vkCreateFence(myDevice, &fenceInfo, nullptr, &myFrameFences[bufferIt]));
+
+			VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myImageAcquiredSemaphores[bufferIt]));
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myRenderCompleteSemaphores[bufferIt]));
+
+			// IMGUI uses primary command buffer only
+			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
+			fd->CommandPool = myCommandPools[0];
+			fd->CommandBuffer = myCommandBuffers[myCommandBufferThreadCount * bufferIt];
+			fd->Fence = myFrameFences[bufferIt];
+			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
+			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
+		}
+		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
 
 		transitionImageLayout(
 			myDepthImage,
@@ -1219,8 +1330,8 @@ private:
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
-		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
+		createRenderPass();
+		createGraphicsPipelines();
 	}
 
 	void checkFlipOrPresentResult(VkResult result)
@@ -1235,45 +1346,65 @@ private:
 			throw std::runtime_error("failed to flip swap chain image!");
 	}
 
-	void updateUniformBuffer()
+	void updateUniformBuffers()
 	{
+		UniformBufferObject* data;
+		CHECK_VK(vmaMapMemory(myAllocator, myUniformBufferMemory, (void**)&data));
+
 		static auto start = std::chrono::high_resolution_clock::now();
 		auto now = std::chrono::high_resolution_clock::now();
 		constexpr float period = 10.0;
 		float t = std::chrono::duration<float>(now - start).count();
-		float tp = fmod(t, period);
-		float s = smootherstep(
-			smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
-		glm::mat4 model = glm::rotate(
-			glm::translate(
-				glm::mat4(1),
-				glm::vec3(0, 0, -0.01f - std::numeric_limits<float>::epsilon())),
-			s * glm::radians(360.0f),
-			glm::vec3(0.0, 0.0, 1.0));
+		for (uint32_t n = 0; n < (NX * NY); n++)
+		{
+			UniformBufferObject& ubo = data[n];				
 
-		glm::mat4 view0 = glm::mat4(1);
-		glm::mat4 proj0 = glm::frustum(-1.0, 1.0, -1.0, 1.0, 0.01, 10.0);
+			float tp = fmod((0.0025f * n) + t, period);
+			float s = smootherstep(
+				smoothstep(clamp(ramp(tp < (0.5f * period) ? tp : period - tp, 0, 0.5f * period), 0, 1)));
 
-		glm::mat4 view1 = glm::lookAt(glm::vec3(1.5f, 1.5f, 1.0f), glm::vec3(0.0f, 0.0f, -0.5f), glm::vec3(0.0f, 0.0f, -1.0f));
-		glm::mat4 proj1 = glm::perspective(glm::radians(75.0f), myWindowData->Width / static_cast<float>(myWindowData->Height), 0.01f, 10.0f);
+			glm::mat4 model = glm::rotate(
+				glm::translate(
+					glm::mat4(1),
+					glm::vec3(0, 0, -0.01f - std::numeric_limits<float>::epsilon())),
+				s * glm::radians(360.0f),
+				glm::vec3(0.0, 0.0, 1.0));
 
-		UniformBufferObject ubo = {};
-		ubo.model = model;
-		ubo.view = glm::mat4(
-			lerp(view0[0], view1[0], s),
-			lerp(view0[1], view1[1], s),
-			lerp(view0[2], view1[2], s),
-			lerp(view0[3], view1[3], s));
-		ubo.proj = glm::mat4(
-			lerp(proj0[0], proj1[0], s),
-			lerp(proj0[1], proj1[1], s),
-			lerp(proj0[2], proj1[2], s),
-			lerp(proj0[3], proj1[3], s));
+			glm::mat4 view0 = glm::mat4(1);
+			glm::mat4 proj0 = glm::frustum(-1.0, 1.0, -1.0, 1.0, 0.01, 10.0);
+
+			glm::mat4 view1 = 
+				glm::lookAt(
+					glm::vec3(1.5f, 1.5f, 1.0f),
+					glm::vec3(0.0f, 0.0f, -0.5f),
+					glm::vec3(0.0f, 0.0f, -1.0f));
+			glm::mat4 proj1 = 
+				glm::perspective(
+					glm::radians(75.0f),
+					myWindowData->Width / static_cast<float>(myWindowData->Height),
+					0.01f,
+					10.0f);
+
+			ubo.model = model;
+			ubo.view = glm::mat4(
+				lerp(view0[0], view1[0], s),
+				lerp(view0[1], view1[1], s),
+				lerp(view0[2], view1[2], s),
+				lerp(view0[3], view1[3], s));
+			ubo.proj = glm::mat4(
+				lerp(proj0[0], proj1[0], s),
+				lerp(proj0[1], proj1[1], s),
+				lerp(proj0[2], proj1[2], s),
+				lerp(proj0[3], proj1[3], s));
+
+			vmaFlushAllocation(
+				myAllocator,
+				myUniformBufferMemory,
+				n * sizeof(UniformBufferObject),
+				sizeof(UniformBufferObject));
+		}
 		
-		void* data;
-		CHECK_VK(vmaMapMemory(myAllocator, myUniformBufferMemory, &data));
-		memcpy(data, &ubo, sizeof(ubo));
 		vmaUnmapMemory(myAllocator, myUniformBufferMemory);
 	}
 
@@ -1312,10 +1443,22 @@ private:
 			CHECK_VK(myDeviceTable.vkResetFences(myDevice, 1, &newFrame->Fence));
 		}
 
+		// setup draw parameters
+		uint32_t dx = myWindowData->Width / NX;
+		uint32_t dy = myWindowData->Height / NY;
+
+		constexpr uint32_t drawCount = NX * NY;
+		uint32_t segmentCount = std::max(myCommandBufferThreadCount - 1u, 1u);
+		uint32_t segmentDrawCount = drawCount / segmentCount;
+
+		if (drawCount % segmentCount)
+			segmentDrawCount += 1;
+
 		// begin secondary command buffers
-		for (uint32_t cmdIt = 1; cmdIt < myThreadCount; cmdIt++)
+		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + cmdIt];
+			VkCommandBuffer& cmd =
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 			VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 			inherit.renderPass = myRenderPass;
@@ -1330,39 +1473,31 @@ private:
 			secBeginInfo.pInheritanceInfo = &inherit;
 			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
 
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, myGraphicsPipeline);
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				myPipelineLayout, 0, 1, &myDescriptorSet, 0, nullptr);
+			vkCmdBindPipeline(
+				cmd,
+				VK_PIPELINE_BIND_POINT_GRAPHICS,
+				myGraphicsPipelines.data[segmentIt & 1]);
 			
 			VkBuffer vertexBuffers[] = { myVertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
+			VkDeviceSize vertexOffsets[] = { 0 };
 
-			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, vertexOffsets);
 			vkCmdBindIndexBuffer(cmd, myIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 		}
 
 		// draw spinning logos using secondary command buffers
 		{
-			static uint32_t nx = 16;
-			static uint32_t ny = 9;
-
-			uint32_t dx = myWindowData->Width / nx;
-			uint32_t dy = myWindowData->Height / ny;
-
-			uint32_t drawCount = nx * ny;
-			uint32_t segmentCount = std::max(myThreadCount - 1u, 1u);
-			uint32_t segmentDrawCount = drawCount / segmentCount;
-
-			if (drawCount % segmentCount)
-				segmentDrawCount += 1;
-
-#if defined(_WIN32)
-			concurrency::parallel_for(0u, segmentCount, [&](int segmentIt)
-#else
-			for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
-#endif
+			std::array<uint32_t, 128> seq;
+			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
+			std::for_each_n(
+			#ifndef __APPLE__
+				std::execution::par,
+			#endif
+				seq.begin(),
+				segmentCount,
+				[this, &dx, &dy, &segmentDrawCount](uint32_t segmentIt)
 			{
-				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + (segmentIt + 1)];
+				VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 				for (uint32_t drawIt = 0; drawIt < segmentDrawCount; drawIt++)
 				{
@@ -1371,10 +1506,10 @@ private:
 					if (n >= drawCount)
 						break;
 
-					uint32_t i = n % nx;
-					uint32_t j = n / nx;
+					uint32_t i = n % NX;
+					uint32_t j = n / NX;
 
-					auto drawSpinningLogo = [](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height)
+					auto drawSpinningLogo = [this, &n](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height)
 					{
 						VkViewport viewport = {};
 						viewport.x = static_cast<float>(x);
@@ -1388,6 +1523,17 @@ private:
 						scissor.offset = { x, y };
 						scissor.extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
+						uint32_t uniformBufferOffset = n * sizeof(UniformBufferObject);
+						vkCmdBindDescriptorSets(
+							cmd,
+							VK_PIPELINE_BIND_POINT_GRAPHICS,
+							myPipelineLayout,
+							0,
+							1,
+							&myDescriptorSet,
+							1,
+							&uniformBufferOffset);
+
 						vkCmdSetViewport(cmd, 0, 1, &viewport);
 						vkCmdSetScissor(cmd, 0, 1, &scissor);
 						vkCmdDrawIndexed(cmd, static_cast<uint32_t>(sizeof_array(ourIndices)), 1, 0, 0, 0);
@@ -1395,16 +1541,13 @@ private:
 
 					drawSpinningLogo(cmd, i * dx, j * dy, dx, dy);
 				}
-#if defined(_WIN32)
 			});
-#else
-			}
-#endif
 		}
 
-		for (uint32_t cmdIt = 1; cmdIt < myThreadCount; cmdIt++)
+		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
-			VkCommandBuffer& cmd = myCommandBuffers[myWindowData->FrameIndex * myThreadCount + cmdIt];
+			VkCommandBuffer& cmd =
+				myCommandBuffers[myWindowData->FrameIndex * myCommandBufferThreadCount + (segmentIt + 1)];
 
 			CHECK_VK(vkEndCommandBuffer(cmd));
 		}
@@ -1431,8 +1574,8 @@ private:
 			vkCmdBeginRenderPass(newFrame->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 			vkCmdExecuteCommands(newFrame->CommandBuffer,
-				(myThreadCount - 1),
-				&myCommandBuffers[(myWindowData->FrameIndex * myThreadCount) + 1]);
+				(myCommandBufferThreadCount - 1),
+				&myCommandBuffers[(myWindowData->FrameIndex * myCommandBufferThreadCount) + 1]);
 
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
@@ -1485,10 +1628,8 @@ private:
 		checkFlipOrPresentResult(vkQueuePresentKHR(myQueue, &info));
 	}
 
-	void cleanup()
+	void cleanupFrameResources()
 	{
-		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
-
 		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
 		{
 			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
@@ -1498,18 +1639,32 @@ private:
 				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[bufferIt], nullptr);
 			}
 
-			for (uint32_t threadIt = 0; threadIt < myThreadCount; threadIt++)
+			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+			for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
 			{
-				std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
 				for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-					threadCommandBuffers[bufferIt] = myCommandBuffers[myThreadCount * bufferIt + threadIt];
+					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt];
 
-				vkFreeCommandBuffers(myDevice, myCommandPools[threadIt], myBufferCount, threadCommandBuffers.data());
-				vkDestroyCommandPool(myDevice, myCommandPools[threadIt], nullptr);
+				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myBufferCount, threadCommandBuffers.data());
+				vkDestroyCommandPool(myDevice, myCommandPools[cmdIt], nullptr);
 			}
 		}
 
-		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myInstance, myDevice, myWindowData.get(), nullptr);
+		ImGui_ImplVulkanH_DestroyWindowDataSwapChainAndFramebuffer(myDevice, myWindowData.get(), nullptr);
+
+		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
+		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
+
+		for (uint32_t pipelineIt = 0; pipelineIt < GraphicsPipelines::Count; pipelineIt++)
+			myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipelines.data[pipelineIt], nullptr);
+		
+		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
+		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
+	}
+
+	void cleanup()
+	{
+		cleanupFrameResources();
 
 		ImGui_ImplVulkan_Shutdown();
 
@@ -1518,23 +1673,20 @@ private:
 		vmaDestroyBuffer(myAllocator, myUniformBuffer, myUniformBufferMemory);
 		vmaDestroyBuffer(myAllocator, myVertexBuffer, myVertexBufferMemory);
 		vmaDestroyBuffer(myAllocator, myIndexBuffer, myIndexBufferMemory);
-		vmaDestroyImage(myAllocator, myImage, myImageMemory);
-		vmaDestroyImage(myAllocator, myDepthImage, myDepthImageMemory);
 		
+		vmaDestroyImage(myAllocator, myImage, myImageMemory);
 		myDeviceTable.vkDestroyImageView(myDevice, myImageView, nullptr);
-		myDeviceTable.vkDestroyImageView(myDevice, myDepthImageView, nullptr);
+
 		myDeviceTable.vkDestroySampler(myDevice, mySampler, nullptr);
 
 		myDeviceTable.vkDestroyDescriptorSetLayout(myDevice, myDescriptorSetLayout, nullptr);
 		myDeviceTable.vkDestroyDescriptorPool(myDevice, myDescriptorPool, nullptr);
 
-		myDeviceTable.vkDestroyPipeline(myDevice, myGraphicsPipeline, nullptr);
-		myDeviceTable.vkDestroyPipelineLayout(myDevice, myPipelineLayout, nullptr);
-		myDeviceTable.vkDestroyRenderPass(myDevice, myRenderPass, nullptr);
-
 		vmaDestroyAllocator(myAllocator);
 
 		myDeviceTable.vkDestroyDevice(myDevice, nullptr);
+		
+		vkDestroySurfaceKHR(myInstance, mySurface, nullptr);
 
 		vkDestroyDebugReportCallbackEXT(myInstance, myDebugCallback, nullptr);
 
@@ -1546,6 +1698,7 @@ private:
 		glm::mat4 model;
 		glm::mat4 view;
 		glm::mat4 proj;
+		glm::mat4 pad;
 	};
 
 	struct SimpleVertex2D
@@ -1587,6 +1740,9 @@ private:
 
 	VkInstance myInstance = VK_NULL_HANDLE;
 	VkDebugReportCallbackEXT myDebugCallback = VK_NULL_HANDLE;
+	VkSurfaceKHR mySurface = VK_NULL_HANDLE; // todo: take ownership of this object from IMGUI
+	VkSurfaceFormatKHR mySurfaceFormat = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	VkPresentModeKHR myPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 	VkPhysicalDevice myPhysicalDevice = VK_NULL_HANDLE;
 	VkDevice myDevice = VK_NULL_HANDLE;
 	VolkDeviceTable myDeviceTable = {};
@@ -1598,7 +1754,18 @@ private:
 	VkDescriptorSet myDescriptorSet = VK_NULL_HANDLE;
 	VkRenderPass myRenderPass = VK_NULL_HANDLE;
 	VkPipelineLayout myPipelineLayout = VK_NULL_HANDLE;
-	VkPipeline myGraphicsPipeline = VK_NULL_HANDLE;
+	struct GraphicsPipelines
+	{
+		enum
+		{
+			NoAlphaTest,
+			AlphaTest,
+
+			Count
+		};
+
+		VkPipeline data[Count] = { VK_NULL_HANDLE };
+	} myGraphicsPipelines;
 	VkBuffer myVertexBuffer = VK_NULL_HANDLE;
 	VmaAllocation myVertexBufferMemory = VK_NULL_HANDLE;
 	VkBuffer myIndexBuffer = VK_NULL_HANDLE;
@@ -1625,8 +1792,12 @@ private:
 
 	const std::string myResourcePath;
 
-	uint32_t myBufferCount = 16;
-	uint32_t myThreadCount = 16;
+	uint32_t myBufferCount = 0;
+	uint32_t myCommandBufferThreadCount = 0;
+	int myRequestedCommandBufferThreadCount = 0;
+
+	static constexpr uint32_t NX = 16;
+	static constexpr uint32_t NY = 9;
 };
 
 const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
@@ -1650,13 +1821,14 @@ const uint16_t VulkanApplication::ourIndices[] =
 
 static VulkanApplication* theApp = nullptr;
 
-int vkapp_create(void* view, int width, int height, const char* resourcePath, bool verbose)
+int vkapp_create(void* view, int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight, const char* resourcePath, bool verbose)
 {
 	assert(view != nullptr);
 	assert(theApp == nullptr);
 
+#if defined(__WINDOWS__)
 	static const char* DISABLE_VK_LAYER_VALVE_steam_overlay_1 = "DISABLE_VK_LAYER_VALVE_steam_overlay_1=1";
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 	_putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
 #else
 	putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);
@@ -1677,7 +1849,7 @@ int vkapp_create(void* view, int width, int height, const char* resourcePath, bo
 			std::cout << VK_ICD_FILENAMES_STR << "=" << vkIcdFilenames << std::endl;
 	}
 
-	theApp = new VulkanApplication(view, width, height, resourcePath ? resourcePath : "./", verbose);
+	theApp = new VulkanApplication(view, windowWidth, windowHeight, framebufferWidth, framebufferHeight, resourcePath ? resourcePath : "./", verbose);
 
 	return EXIT_SUCCESS;
 }

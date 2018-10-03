@@ -7,10 +7,12 @@
 .WindowsUcrtLibPath = '$WindowsSDKBasePath$\Lib\10.0.17134.0\ucrt\x86'
 .WindowsUcrtIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\ucrt'
 .WindowsSharedIncludePath = '$WindowsSDKBasePath$\Include\10.0.17134.0\shared'
-Settings {
+Settings
+{
 	#import TMP
 	#import windir
-	.Environment = {
+	.Environment =
+	{
 		'TMP=$TMP$',
 		'SystemRoot=$windir$'
 	}
@@ -22,10 +24,21 @@ Settings {
 .BaseLibPaths = ' -L"$WindowsLibPath$"'
     + ' -L"$WindowsUcrtLibPath$"'
 #endif //__WINDOWS__
+#if __OSX__
+.LLVMBasePath = '/usr/local/opt/llvm/bin'
+.ClangPath = '$LLVMBasePath$'
+Settings
+{
+	.CachePath = "/tmp/.fbuild.cache"
+}
+.BaseIncludePaths = ' -I/usr/local/opt/llvm/include/c++/v1'
+.BaseLibPaths = ' -L/usr/local/opt/llvm/lib'
+#endif //__OSX__
 #if __LINUX__
 .LLVMBasePath = '/usr/bin'
 .ClangPath = '$LLVMBasePath$'
-Settings {
+Settings
+{
 	.CachePath = "/tmp/.fbuild.cache"
 }
 .BaseIncludePaths = ' -I/usr/include'
@@ -36,10 +49,9 @@ Compiler('Compiler-Clang')
 {
 #if __WINDOWS__
 	.Executable = '$ClangPath$/clang++.exe'
-#endif //__WINDOWS__
-#if __LINUX__
+#else
 	.Executable = '$ClangPath$/clang++'
-#endif //__LINUX__
+#endif //__WINDOWS__
 }
 
 .Clang_BaseConfig = [
@@ -49,6 +61,11 @@ Compiler('Compiler-Clang')
 	.Librarian = '$ClangPath$/llvm-ar.exe'
 	.Linker = '$ClangPath$/clang++.exe'
 #endif //__WINDOWS__
+#if __OSX__
+	.PlatformInfo = 'OSX'
+	.Librarian = '$ClangPath$/llvm-ar'
+	.Linker = '$ClangPath$/clang++'
+#endif //__OSX__
 #if __LINUX__
 	.PlatformInfo = 'Linux'
 	.Librarian = '$ClangPath$/llvm-ar'
@@ -58,10 +75,19 @@ Compiler('Compiler-Clang')
 	.BaseCompilerOptions = '-o "%2" "%1" -c -g'
 		+ .BaseIncludePaths
 #if __WINDOWS__
-		+ ' -D__WINDOWS__ -DWIN32 -D_WIN32 -D_CRT_SECURE_NO_WARNINGS'
+		+ ' -D__WINDOWS__'
+		+ ' -DWIN32'
+		+ ' -D_WIN32'
+		+ ' -D_CRT_SECURE_NO_WARNINGS'
+		+ ' -gcodeview'
 #endif //__WINDOWS__
+#if __OSX__
+		+ ' -D__APPLE__'
+		+ ' -D__OSX__'
+#endif //__LINUX__
 #if __LINUX__
-		+ ' -D__LINUX__ -D__linux__'
+		+ ' -D__LINUX__'
+		+ ' -D__linux__'
 #endif //__LINUX__
 	.CompilerOptionsC = ' -std=c11'
 	.CompilerOptionsCpp = ' -std=c++17'
@@ -70,7 +96,12 @@ Compiler('Compiler-Clang')
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
 	.LinkerOptions = .BaseLinkerOptions
-		+ ' -lstdc++'
+#if __OSX__
+	+ ' -lc++'
+#else
+	+ ' -lstdc++'
+#endif
+	
 	.LibrarianOptions = 'rcs "%2" "%1"'
 	.CompilerDebugOptimizations = ' -O0'
 	.CompilerReleaseOptimizations = ' -O3'
@@ -102,6 +133,9 @@ Compiler('Compiler-Clang')
 		+ .CompilerReleaseOptimizations
 	.LibrarianOptions + .LibrarianReleaseOptimizations
 	.LinkerOptions + .LinkerReleaseOptimizations
+#if __WINDOWS__
+		+ ' -lmsvcrt'
+#endif //__WINDOWS__
 ]
 .Clang_x64_ProfileConfig = [
 	Using(.Clang_x64_ReleaseConfig)
@@ -118,13 +152,8 @@ Compiler('Compiler-Clang')
 .ProjectPath = './'
 .IntermediateFilePath = './temp'
 
-#if __WINDOWS__
 #import VULKAN_SDK
 .VulkanSDKPath = '$VULKAN_SDK$'
-#endif //__WINDOWS__
-#if __LINUX__
-.VulkanSDKPath = '$ProjectPath$../VulkanSDK/1.1.82.0/x86_64'
-#endif //__LINUX__
 
 {
 	ForEach(.Config in .Clang_x64_Configs)
@@ -140,14 +169,13 @@ Compiler('Compiler-Clang')
 				+ ' -I$ProjectPath$../imgui'
 				+ ' -I$ProjectPath$../glfw/include'
 				+ ' -DVOLCANO_USE_GLFW'
-#if __WINDOWS__ // to avoid errors in windows headers
+	#if __WINDOWS__ // to avoid errors in windows headers
 				+ ' -Wno-expansion-to-defined'
 				+ ' -Wno-nonportable-include-path'
 				+ ' -Wno-deprecated-declarations'
-#endif //__WINDOWS__
-#if __LINUX__
+	#else
 				+ ' -Wno-unused-variable'
-#endif //__LINUX__
+	#endif //__WINDOWS__
 		ObjectList('$ProjectName$-Lib-$Config$')
 		{
 			// todo: make separate ObjectLists depending on source file type
@@ -161,7 +189,12 @@ Compiler('Compiler-Clang')
 			}
 			.CompilerOutputPath = '$IntermediateFilePath$/$ProjectPath$'
 		}
-		Executable('$ProjectName$-$Config$')
+	#if __WINDOWS__ // but whyyyyyyyyy?
+		.ExecutableName = "$ProjectName$-$Config$";
+	#else
+		.ExecutableName = "$ProjectName$'-'$Config$";
+	#endif
+		Executable('$ExecutableName$')
 		{
 			.Libraries = { '$ProjectName$-Lib-$Config$' }
 		#if __WINDOWS__
@@ -180,36 +213,90 @@ Compiler('Compiler-Clang')
 				+ ' -lm'
 				+ ' -ldl'
 				+ ' -lpthread'
-				+ ' -lX11'
 				+ ' -lvulkan'
 				+ ' -lglfw3'
+				+ ' -lX11'
 		#endif //__LINUX__
+		#if __OSX__
+			.LinkerOutput = 'volcano-$Config$'
+			.LinkerOptions + ' -L$VulkanSDKPath$/lib'
+				+ ' -L$ProjectPath$../glfw/build/src'
+				+ ' -lvulkan'
+				+ ' -lglfw3'
+				+ ' -framework Cocoa'
+				+ ' -framework IOKit'
+				+ ' -framework CoreVideo'
+				+ ' -rpath @executable_path/bin/osx-x64/'
+		#endif
 		}
 	}
 }
 
+Copy('CopyVulkan')
+{
+#if __WINDOWS__
+	.Source =
+	{
+		'$VulkanSDKPath$/Source/lib/vulkan-1.dll',
+	}
+	.Dest = '$ProjectPath$/bin/windows-x64/'
+#endif //__WINDOWS__
+#if __LINUX__
+	.Source =
+	{
+		'$VulkanSDKPath$/lib/libvulkan.so',
+		'$VulkanSDKPath$/lib/libvulkan.1.so',
+		'$VulkanSDKPath$/lib/libvulkan.1.1.82.so'
+	}
+	.Dest = '$ProjectPath$/bin/linux-x64/'
+#endif //__LINUX__
+#if __OSX__
+	.Source =
+	{
+		'$VulkanSDKPath$/lib/libvulkan.dylib',
+		'$VulkanSDKPath$/lib/libvulkan.1.dylib',
+		'$VulkanSDKPath$/lib/libvulkan.1.1.82.dylib'
+	}
+	.Dest = '$ProjectPath$/bin/osx-x64/'
+#endif //__OSX__
+}
+
 Alias('release')
 {
-	.Targets = {
-		'$ProjectName$-Lib-Release', '$ProjectName$-Release'
+	.Targets =
+	{
+		'CopyVulkan',
+		'$ProjectName$-Lib-Release',
+		'$ProjectName$-Release'
 	}
 }
 
 Alias('profile')
 {
-	.Targets = {
-		'$ProjectName$-Lib-Profile', '$ProjectName$-Profile'
+	.Targets =
+	{
+		'CopyVulkan',
+		'$ProjectName$-Lib-Profile',
+		'$ProjectName$-Profile'
 	}
 }
 
 Alias('debug')
 {
-	.Targets = {
-		'$ProjectName$-Lib-Debug', '$ProjectName$-Debug'
+	.Targets =
+	{
+		'CopyVulkan',
+		'$ProjectName$-Lib-Debug',
+		'$ProjectName$-Debug'
 	}
 }
 
 Alias('all')
 {
-	.Targets = { 'release', 'profile', 'debug' }
+	.Targets =
+	{
+		'release',
+		'profile',
+		'debug'
+	}
 }

@@ -5,3 +5,5 @@ temp/*
 volcano*
 *.fdb
 *.obj
+*.DS_Store
+imgui.ini

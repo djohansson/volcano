@@ -20,7 +20,6 @@
 @interface RenderView()
 {
     CVDisplayLinkRef myDisplayLink;
-    unsigned int myFrameIndex;
 }
 - (CVReturn)getFrameForTime:(const CVTimeStamp*)outputTime;
 @end
@@ -62,15 +61,13 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
     renderLayer.framebufferOnly = YES;
     renderLayer.frame = self.bounds;
     renderLayer.drawableSize = size;
-    
-    myFrameIndex = 0;
-    
+        
     CFURLRef resourceURL = CFURLCopyAbsoluteURL(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
     char resourcePath[1024];
     CFStringGetFileSystemRepresentation(CFURLCopyFileSystemPath(resourceURL, kCFURLPOSIXPathStyle), resourcePath, sizeof(resourcePath) - 1);
     strcat(resourcePath, "/resources/");
     
-    vkapp_create((__bridge void*)(self), (int)size.width, (int)size.height, resourcePath, false);
+    vkapp_create((__bridge void*)(self), (int)self.bounds.size.width, (int)self.bounds.size.width, (int)size.width, (int)size.height, resourcePath, false);
     
     // Add a tracking area in order to receive mouse events whenever the mouse is within the bounds of our view
     NSTrackingArea* trackingArea = [[NSTrackingArea alloc] initWithRect:NSZeroRect options:NSTrackingMouseMoved | NSTrackingInVisibleRect | NSTrackingActiveAlways owner:self userInfo:nil];

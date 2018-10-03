@@ -2,19 +2,12 @@
 #include <stdlib.h>
 
 #define GLFW_INCLUDE_NONE
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <vulkan/vulkan.h>
-
 #include <imgui.h>
-
 #include <examples/imgui_impl_glfw.h>
 
 #include "../../Volcano.h"
-
-static bool g_resizeWanted = false;
-static unsigned int g_resizeWidth = 0, g_resizeHeight = 0;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -23,16 +16,14 @@ static void glfw_error_callback(int error, const char* description)
 
 static void glfw_resize_callback(GLFWwindow*, int w, int h)
 {
-	g_resizeWanted = true;
-	g_resizeWidth = w;
-	g_resizeHeight = h;
+	vkapp_resize(w, h);
 }
 
 int main(int, char**)
 {
 	// todo: parse commandline
-	static const uint32_t width = 1920;
-	static const uint32_t height = 1080;
+	static constexpr uint32_t windowWidth = 1280;
+	static constexpr uint32_t windowHeight = 720;
 
 	// Setup window
 	glfwSetErrorCallback(glfw_error_callback);
@@ -40,7 +31,7 @@ int main(int, char**)
 		return 1;
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(width, height, "volcano", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "volcano", NULL, NULL);
 
 	// Setup Vulkan
 	if (!glfwVulkanSupported())
@@ -49,11 +40,12 @@ int main(int, char**)
 		return 1;
 	}
 
-	vkapp_create(window, width, height, "./resources/", true);
+	int framebufferWidth, framebufferHeight;
+	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+	vkapp_create(window, windowWidth, windowHeight, framebufferWidth, framebufferHeight, "./resources/", true);
 
 	// Create Framebuffer resize callback
-	int w, h;
-	glfwGetFramebufferSize(window, &w, &h);
 	glfwSetFramebufferSizeCallback(window, glfw_resize_callback);
 
 	// Setup GLFW binding
@@ -70,12 +62,6 @@ int main(int, char**)
 		// application. Generally you may always pass all inputs to dear imgui, and hide them from
 		// your application based on those two flags.
 		glfwPollEvents();
-		
-		if (g_resizeWanted)
-		{
-			// todo
-			g_resizeWanted = false;
-		}
 
 		ImGui_ImplGlfw_NewFrame();
 

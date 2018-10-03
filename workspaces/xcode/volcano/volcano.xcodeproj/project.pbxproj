@@ -17,10 +17,23 @@
 		538E9F632120998A00524466 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 538E9F5F2120998A00524466 /* AppDelegate.m */; };
 		53D052AB2120A38500BAFBC2 /* resources in Resources */ = {isa = PBXBuildFile; fileRef = 538E9F4A2120971300524466 /* resources */; };
 		53D052B72120A51B00BAFBC2 /* Volcano.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53D052B62120A51B00BAFBC2 /* Volcano.cpp */; };
-		53D052BA2120A54600BAFBC2 /* vulkan.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53D052B92120A54600BAFBC2 /* vulkan.framework */; };
-		53D052BB2120A56600BAFBC2 /* vulkan.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53D052B92120A54600BAFBC2 /* vulkan.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		53D052C92120A5F100BAFBC2 /* libMoltenVK.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		53D052CB2120A62800BAFBC2 /* vulkan in Resources */ = {isa = PBXBuildFile; fileRef = 53D052CA2120A62800BAFBC2 /* vulkan */; };
+		53E0147E214C3AA300E4AEF7 /* vulkan.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0147D214C3AA300E4AEF7 /* vulkan.framework */; };
+		53E0147F214C3E2600E4AEF7 /* vulkan.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0147D214C3AA300E4AEF7 /* vulkan.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		53E01497214C429B00E4AEF7 /* libMoltenVK.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E01496214C429A00E4AEF7 /* libMoltenVK.dylib */; };
+		53E01498214C42A800E4AEF7 /* libMoltenVK.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E01496214C429A00E4AEF7 /* libMoltenVK.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E0149F214C431200E4AEF7 /* libVkLayer_parameter_validation.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E01499214C431100E4AEF7 /* libVkLayer_parameter_validation.dylib */; };
+		53E014A0214C431200E4AEF7 /* libVkLayer_unique_objects.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0149A214C431100E4AEF7 /* libVkLayer_unique_objects.dylib */; };
+		53E014A1214C431200E4AEF7 /* libVkLayer_core_validation.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0149B214C431100E4AEF7 /* libVkLayer_core_validation.dylib */; };
+		53E014A2214C431200E4AEF7 /* libVkLayer_object_tracker.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0149C214C431200E4AEF7 /* libVkLayer_object_tracker.dylib */; };
+		53E014A3214C431200E4AEF7 /* libVkLayer_threading.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0149D214C431200E4AEF7 /* libVkLayer_threading.dylib */; };
+		53E014A4214C431200E4AEF7 /* libvulkan.1.1.82.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53E0149E214C431200E4AEF7 /* libvulkan.1.1.82.dylib */; };
+		53E014A5214C432000E4AEF7 /* libVkLayer_core_validation.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0149B214C431100E4AEF7 /* libVkLayer_core_validation.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014A6214C432000E4AEF7 /* libVkLayer_object_tracker.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0149C214C431200E4AEF7 /* libVkLayer_object_tracker.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014A7214C432000E4AEF7 /* libVkLayer_parameter_validation.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E01499214C431100E4AEF7 /* libVkLayer_parameter_validation.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014A8214C432000E4AEF7 /* libVkLayer_threading.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0149D214C431200E4AEF7 /* libVkLayer_threading.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014A9214C432000E4AEF7 /* libVkLayer_unique_objects.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0149A214C431100E4AEF7 /* libVkLayer_unique_objects.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014AA214C432000E4AEF7 /* libvulkan.1.1.82.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 53E0149E214C431200E4AEF7 /* libvulkan.1.1.82.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53E014B6214C46A400E4AEF7 /* vulkan in Resources */ = {isa = PBXBuildFile; fileRef = 53E014B5214C46A400E4AEF7 /* vulkan */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -30,7 +43,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				53D052BB2120A56600BAFBC2 /* vulkan.framework in CopyFiles */,
+				53E0147F214C3E2600E4AEF7 /* vulkan.framework in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -40,7 +53,13 @@
 			dstPath = ../lib;
 			dstSubfolderSpec = 6;
 			files = (
-				53D052C92120A5F100BAFBC2 /* libMoltenVK.dylib in CopyFiles */,
+				53E014A5214C432000E4AEF7 /* libVkLayer_core_validation.dylib in CopyFiles */,
+				53E014A6214C432000E4AEF7 /* libVkLayer_object_tracker.dylib in CopyFiles */,
+				53E014A7214C432000E4AEF7 /* libVkLayer_parameter_validation.dylib in CopyFiles */,
+				53E014A8214C432000E4AEF7 /* libVkLayer_threading.dylib in CopyFiles */,
+				53E014A9214C432000E4AEF7 /* libVkLayer_unique_objects.dylib in CopyFiles */,
+				53E014AA214C432000E4AEF7 /* libvulkan.1.1.82.dylib in CopyFiles */,
+				53E01498214C42A800E4AEF7 /* libMoltenVK.dylib in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,9 +86,15 @@
 		538E9F5F2120998A00524466 /* AppDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppDelegate.m; path = ../../../../src/platform/osx/AppDelegate.m; sourceTree = "<group>"; };
 		53D052B52120A51B00BAFBC2 /* Volcano.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Volcano.h; path = ../../../../src/Volcano.h; sourceTree = "<group>"; };
 		53D052B62120A51B00BAFBC2 /* Volcano.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Volcano.cpp; path = ../../../../src/Volcano.cpp; sourceTree = "<group>"; };
-		53D052B92120A54600BAFBC2 /* vulkan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = vulkan.framework; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks/vulkan.framework"; sourceTree = "<group>"; };
-		53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libMoltenVK.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/MoltenVK/macOS/libMoltenVK.dylib"; sourceTree = "<group>"; };
-		53D052CA2120A62800BAFBC2 /* vulkan */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vulkan; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/etc/vulkan"; sourceTree = "<group>"; };
+		53E0147D214C3AA300E4AEF7 /* vulkan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = vulkan.framework; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/Frameworks/vulkan.framework"; sourceTree = "<group>"; };
+		53E01496214C429A00E4AEF7 /* libMoltenVK.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libMoltenVK.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libMoltenVK.dylib"; sourceTree = "<group>"; };
+		53E01499214C431100E4AEF7 /* libVkLayer_parameter_validation.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libVkLayer_parameter_validation.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libVkLayer_parameter_validation.dylib"; sourceTree = "<group>"; };
+		53E0149A214C431100E4AEF7 /* libVkLayer_unique_objects.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libVkLayer_unique_objects.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libVkLayer_unique_objects.dylib"; sourceTree = "<group>"; };
+		53E0149B214C431100E4AEF7 /* libVkLayer_core_validation.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libVkLayer_core_validation.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libVkLayer_core_validation.dylib"; sourceTree = "<group>"; };
+		53E0149C214C431200E4AEF7 /* libVkLayer_object_tracker.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libVkLayer_object_tracker.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libVkLayer_object_tracker.dylib"; sourceTree = "<group>"; };
+		53E0149D214C431200E4AEF7 /* libVkLayer_threading.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libVkLayer_threading.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libVkLayer_threading.dylib"; sourceTree = "<group>"; };
+		53E0149E214C431200E4AEF7 /* libvulkan.1.1.82.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libvulkan.1.1.82.dylib; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib/libvulkan.1.1.82.dylib"; sourceTree = "<group>"; };
+		53E014B5214C46A400E4AEF7 /* vulkan */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vulkan; path = "../../../../../../../usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/etc/vulkan"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,7 +102,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				53D052BA2120A54600BAFBC2 /* vulkan.framework in Frameworks */,
+				53E014A1214C431200E4AEF7 /* libVkLayer_core_validation.dylib in Frameworks */,
+				53E01497214C429B00E4AEF7 /* libMoltenVK.dylib in Frameworks */,
+				53E014A0214C431200E4AEF7 /* libVkLayer_unique_objects.dylib in Frameworks */,
+				53E014A3214C431200E4AEF7 /* libVkLayer_threading.dylib in Frameworks */,
+				53E0149F214C431200E4AEF7 /* libVkLayer_parameter_validation.dylib in Frameworks */,
+				53E0147E214C3AA300E4AEF7 /* vulkan.framework in Frameworks */,
+				53E014A4214C431200E4AEF7 /* libvulkan.1.1.82.dylib in Frameworks */,
+				53E014A2214C431200E4AEF7 /* libVkLayer_object_tracker.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,8 +119,14 @@
 		538E9EFA2120951F00524466 = {
 			isa = PBXGroup;
 			children = (
-				53D052CA2120A62800BAFBC2 /* vulkan */,
-				53D052C82120A5F100BAFBC2 /* libMoltenVK.dylib */,
+				53E014B5214C46A400E4AEF7 /* vulkan */,
+				53E0149B214C431100E4AEF7 /* libVkLayer_core_validation.dylib */,
+				53E0149C214C431200E4AEF7 /* libVkLayer_object_tracker.dylib */,
+				53E01499214C431100E4AEF7 /* libVkLayer_parameter_validation.dylib */,
+				53E0149D214C431200E4AEF7 /* libVkLayer_threading.dylib */,
+				53E0149A214C431100E4AEF7 /* libVkLayer_unique_objects.dylib */,
+				53E0149E214C431200E4AEF7 /* libvulkan.1.1.82.dylib */,
+				53E01496214C429A00E4AEF7 /* libMoltenVK.dylib */,
 				538E9F4A2120971300524466 /* resources */,
 				538E9F052120951F00524466 /* volcano */,
 				538E9F042120951F00524466 /* Products */,
@@ -132,7 +170,7 @@
 		53D052B82120A54600BAFBC2 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				53D052B92120A54600BAFBC2 /* vulkan.framework */,
+				53E0147D214C3AA300E4AEF7 /* vulkan.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -196,8 +234,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				53D052CB2120A62800BAFBC2 /* vulkan in Resources */,
 				53D052AB2120A38500BAFBC2 /* resources in Resources */,
+				53E014B6214C46A400E4AEF7 /* vulkan in Resources */,
 				538E9F1C2120959B00524466 /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -346,26 +384,32 @@
 		538E9F182120952100524466 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_ENTITLEMENTS = volcano/volcano.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
-					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/Frameworks",
 					"$(PROJECT_DIR)/Frameworks",
 				);
 				HEADER_SEARCH_PATHS = (
-					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/include",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/include",
 					/Users/danjo/Work/VulkanMemoryAllocator/src,
 					/Users/danjo/Work/imgui,
 					/Users/danjo/Work/stb,
 					/Users/danjo/Work/glm,
+					/Users/danjo/Work/volk,
 				);
 				INFOPLIST_FILE = volcano/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+					"@executable_path/../lib",
 				);
-				LIBRARY_SEARCH_PATHS = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/lib";
+				LIBRARY_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/MoltenVK/macOS",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = Ubisoft.volcano;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -374,26 +418,32 @@
 		538E9F192120952100524466 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_ENTITLEMENTS = volcano/volcano.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
-					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/Frameworks",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/Frameworks",
 					"$(PROJECT_DIR)/Frameworks",
 				);
 				HEADER_SEARCH_PATHS = (
-					"/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/include",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/include",
 					/Users/danjo/Work/VulkanMemoryAllocator/src,
 					/Users/danjo/Work/imgui,
 					/Users/danjo/Work/stb,
 					/Users/danjo/Work/glm,
+					/Users/danjo/Work/volk,
 				);
 				INFOPLIST_FILE = volcano/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+					"@executable_path/../lib",
 				);
-				LIBRARY_SEARCH_PATHS = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/lib";
+				LIBRARY_SEARCH_PATHS = (
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib",
+					"/usr/local/Caskroom/vulkan-sdk/1.1.82.0/MoltenVK/macOS",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = Ubisoft.volcano;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};

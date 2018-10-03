@@ -1,6 +1,7 @@
 {
 	"C_Cpp.dimInactiveRegions": false,
 	"files.associations": {
+		"*.mshader": "hlsl",
 		"algorithm": "cpp",
 		"array": "cpp",
 		"atomic": "cpp",
@@ -54,6 +55,7 @@
 		"xstddef": "cpp",
 		"xstring": "cpp",
 		"xtr1common": "cpp",
-		"xutility": "cpp"
+		"xutility": "cpp",
+		"deque": "cpp"
 	}
 }

@@ -10,6 +10,8 @@
 				"includePath": [
 					"${workspaceFolder}/**",
 					"${env:VULKAN_SDK}/include",
+					"${env:VULKAN_SDK}/Source/layers",
+					"${env:VULKAN_SDK}/Source/loader",
 					"${workspaceRoot}/../glm",
 					"${workspaceRoot}/../volk",
 					"${workspaceRoot}/../VulkanMemoryAllocator/src",
@@ -26,6 +28,8 @@
 					"path": [
 						"${workspaceFolder}/**",
 						"${env:VULKAN_SDK}/include",
+						"${env:VULKAN_SDK}/Source/layers",
+						"${env:VULKAN_SDK}/Source/loader",
 						"${workspaceRoot}/../glm",
 						"${workspaceRoot}/../volk",
 						"${workspaceRoot}/../VulkanMemoryAllocator/src",
@@ -33,7 +37,7 @@
 						"${workspaceRoot}/../imgui",
 						"${workspaceRoot}/../glfw/include"
 					],	
-					"limitSymbolsToIncludedHeaders": true,
+					"limitSymbolsToIncludedHeaders": false,
 					"databaseFilename": ""
 				}
 			},
@@ -68,7 +72,7 @@
 						"${workspaceRoot}/../imgui",
 						"${workspaceRoot}/../glfw/include"
 					],	
-					"limitSymbolsToIncludedHeaders": true,
+					"limitSymbolsToIncludedHeaders": false,
 					"databaseFilename": ""
 				}
 			}

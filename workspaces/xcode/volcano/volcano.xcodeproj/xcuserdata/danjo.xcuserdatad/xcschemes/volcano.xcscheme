@@ -50,6 +50,8 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
+      enableGPUFrameCaptureMode = "3"
+      enableGPUValidationMode = "1"
       allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
@@ -64,17 +66,17 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "PATH"
-            value = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/bin:$PATH"
+            value = "/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/bin:$PATH"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "DYLD_LIBRARY_PATH"
-            value = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS/lib"
+            value = "/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS/lib"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "VK_SDK_DIR"
-            value = "/usr/local/Caskroom/vulkan-sdk/1.1.77.0/macOS"
+            value = "/usr/local/Caskroom/vulkan-sdk/1.1.82.0/macOS"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable

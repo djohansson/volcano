@@ -5,32 +5,58 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "(gdb) Launch",
+			"name": "(lldb) Launch Debug",
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/volcano-Debug",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
-			"environment": [],
-			"externalConsole": true,
-			"MIMode": "gdb",
-			"setupCommands": [
-				{
-					"description": "Enable pretty-printing for gdb",
-					"text": "-enable-pretty-printing",
-					"ignoreFailures": true
-				}
-			]
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "lldb"
 		},
 		{
-			"name": "(Windows) C++ Attach",
-			"type": "cppvsdbg",
-			"request": "attach",
-			"processId": "${command:pickProcess}"
+			"name": "(lldb) Launch Profile",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Profile",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "lldb"
 		},
 		{
-			"name": "(Windows) C++ Launch",
+			"name": "(lldb) Launch Release",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Release",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
+				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "lldb"
+		},
+		{
+			"name": "(Windows) Launch Debug",
 			"type": "cppvsdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/volcano-Debug.exe",
@@ -38,8 +64,47 @@
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
-			"externalConsole": true,
-			"symbolSearchPath": "srv*d:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib"
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
+		},
+		{
+			"name": "(Windows) Launch Profile",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Profile.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
+		},
+		{
+			"name": "(Windows) Launch Release",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Release.exe",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": false,
+			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
+			"sourceFileMap":
+			{
+				"c:/vulkansdkbuild/workspace/vulkan-validationlayers/repo/": "${env:VULKAN_SDK}/Source/",
+				"c:/VulkanSDK/1.1.82.0/Source/build/": "${env:VULKAN_SDK}/Source/"
+			}
 		}
 	]
 }
