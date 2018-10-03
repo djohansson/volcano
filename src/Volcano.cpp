@@ -52,7 +52,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#ifndef __APPLE__
+#if defined(__WINDOWS__)
 #include <execution>
 #endif
 #include <fstream>
@@ -1490,7 +1490,7 @@ private:
 			std::array<uint32_t, 128> seq;
 			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
 			std::for_each_n(
-			#ifndef __APPLE__
+			#if defined(__WINDOWS__)
 				std::execution::par,
 			#endif
 				seq.begin(),
@@ -1826,7 +1826,6 @@ int vkapp_create(void* view, int windowWidth, int windowHeight, int framebufferW
 	assert(view != nullptr);
 	assert(theApp == nullptr);
 
-#if defined(__WINDOWS__)
 	static const char* DISABLE_VK_LAYER_VALVE_steam_overlay_1 = "DISABLE_VK_LAYER_VALVE_steam_overlay_1=1";
 #if defined(__WINDOWS__)
 	_putenv((char*)DISABLE_VK_LAYER_VALVE_steam_overlay_1);

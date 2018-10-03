@@ -88,6 +88,7 @@ Compiler('Compiler-Clang')
 #if __LINUX__
 		+ ' -D__LINUX__'
 		+ ' -D__linux__'
+		+ ' -stdlib=libc++'
 #endif //__LINUX__
 	.CompilerOptionsC = ' -std=c11'
 	.CompilerOptionsCpp = ' -std=c++17'
@@ -96,10 +97,10 @@ Compiler('Compiler-Clang')
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
 	.LinkerOptions = .BaseLinkerOptions
-#if __OSX__
+#if !__WINDOWS__
 	+ ' -lc++'
 #else
-	+ ' -lstdc++'
+	+ ' -lstdc++' // I think this gets translated to windows sdk headers/libs somehow
 #endif
 	
 	.LibrarianOptions = 'rcs "%2" "%1"'
@@ -244,9 +245,9 @@ Copy('CopyVulkan')
 #if __LINUX__
 	.Source =
 	{
-		'$VulkanSDKPath$/lib/libvulkan.so',
-		'$VulkanSDKPath$/lib/libvulkan.1.so',
-		'$VulkanSDKPath$/lib/libvulkan.1.1.82.so'
+	//	'$VulkanSDKPath$/lib/libvulkan.so',
+	//	'$VulkanSDKPath$/lib/libvulkan.so.1',
+	//	'$VulkanSDKPath$/lib/libvulkan.so.1.1.82'
 	}
 	.Dest = '$ProjectPath$/bin/linux-x64/'
 #endif //__LINUX__

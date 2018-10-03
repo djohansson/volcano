@@ -5,6 +5,72 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "(gdb) Launch Debug",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Debug",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
+			"name": "(gdb) Launch Profile",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Profile",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
+			"name": "(gdb) Launch Release",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/volcano-Release",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
 			"name": "(lldb) Launch Debug",
 			"type": "cppdbg",
 			"request": "launch",
@@ -14,8 +80,6 @@
 			"cwd": "${workspaceFolder}",
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
-				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
@@ -31,8 +95,6 @@
 			"cwd": "${workspaceFolder}",
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
-				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
@@ -48,8 +110,6 @@
 			"cwd": "${workspaceFolder}",
 			"environment": [
 				{ "name":"DYLD_PRINT_LIBRARIES", "value":"1" },
-				{ "name":"VK_ICD_FILENAMES", "value":"${env:VULKAN_SDK}/etc/vulkan/icd.d/MoltenVK_icd.json" },
-				{ "name":"VK_LAYER_PATH", "value":"${env:VULKAN_SDK}/etc/vulkan/explicit_layer.d" },
 				{ "name":"VK_LOADER_DEBUG", "value":"all" }
 			],
 			"externalConsole": false,
@@ -63,7 +123,9 @@
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
-			"environment": [],
+			"environment": [
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
 			"externalConsole": false,
 			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
 			"sourceFileMap":
@@ -80,7 +142,9 @@
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
-			"environment": [],
+			"environment": [
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
 			"externalConsole": false,
 			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
 			"sourceFileMap":
@@ -97,7 +161,9 @@
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
-			"environment": [],
+			"environment": [
+				{ "name":"VK_LOADER_DEBUG", "value":"all" }
+			],
 			"externalConsole": false,
 			"symbolSearchPath": "srv*c:/symbolcache*https://msdl.microsoft.com/download/symbols;${env:VULKAN_SDK}/lib;${env:VULKAN_SDK}/Source/lib",
 			"sourceFileMap":
