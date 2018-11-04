@@ -418,7 +418,7 @@ private:
 
 				// Request a certain mode and confirm that it is available. If not use VK_PRESENT_MODE_FIFO_KHR which is mandatory
 				myPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-				myBufferCount = 2;
+				myFrameCount = 2;
 				for (uint32_t request_i = 0; request_i < sizeof_array(requestPresentMode); request_i++)
 				{
 					auto modeIt = std::find(swapChain.presentModes.begin(), swapChain.presentModes.end(), requestPresentMode[request_i]);
@@ -427,7 +427,7 @@ private:
 						myPresentMode = *modeIt;
 						
 						if (myPresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-							myBufferCount = 3;
+							myFrameCount = 3;
 
 						break;
 					}
@@ -1241,7 +1241,7 @@ private:
 
 	void createFrameResources(int width, int height)
 	{
-		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(myBufferCount);
+		myWindowData = std::make_unique<ImGui_ImplVulkanH_WindowData>(myFrameCount);
 
 		// vkAcquireNextImageKHR uses semaphore from last frame -> cant use index 0 for first frame
 		myWindowData->FrameIndex = myWindowData->FrameCount - 1;
@@ -1275,13 +1275,13 @@ private:
 		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		myCommandPools.resize(myCommandBufferThreadCount);
-		myCommandBuffers.resize(myCommandBufferThreadCount * myBufferCount);
+		myCommandBuffers.resize(myCommandBufferThreadCount * myFrameCount);
 
 		// Create SwapChain, RenderPass, Framebuffer, etc.
 		ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
 			myPhysicalDevice, myDevice, myWindowData.get(), nullptr, width, height, true, myDepthImageView, myDepthFormat);
 
-		std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+		std::vector<VkCommandBuffer> threadCommandBuffers(myFrameCount);
 		for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
 		{
 			VkCommandPoolCreateInfo cmdPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
@@ -1293,34 +1293,34 @@ private:
 			VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
 			cmdInfo.commandPool = myCommandPools[cmdIt];
 			cmdInfo.level = cmdIt == 0 ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-			cmdInfo.commandBufferCount = myBufferCount;
+			cmdInfo.commandBufferCount = myFrameCount;
 			CHECK_VK(vkAllocateCommandBuffers(myDevice, &cmdInfo, threadCommandBuffers.data()));
 
-			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-				myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt] = threadCommandBuffers[bufferIt];
+			for (uint32_t frameIt = 0; frameIt < myFrameCount; frameIt++)
+				myCommandBuffers[myCommandBufferThreadCount * frameIt + cmdIt] = threadCommandBuffers[frameIt];
 		}
 
-		myFrameFences.resize(myBufferCount);
-		myImageAcquiredSemaphores.resize(myBufferCount);
-		myRenderCompleteSemaphores.resize(myBufferCount);
+		myFrameFences.resize(myFrameCount);
+		myImageAcquiredSemaphores.resize(myFrameCount);
+		myRenderCompleteSemaphores.resize(myFrameCount);
 
-		for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
+		for (uint32_t frameIt = 0; frameIt < myFrameCount; frameIt++)
 		{
 			VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
 			fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-			CHECK_VK(vkCreateFence(myDevice, &fenceInfo, nullptr, &myFrameFences[bufferIt]));
+			CHECK_VK(vkCreateFence(myDevice, &fenceInfo, nullptr, &myFrameFences[frameIt]));
 
 			VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myImageAcquiredSemaphores[bufferIt]));
-			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myRenderCompleteSemaphores[bufferIt]));
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myImageAcquiredSemaphores[frameIt]));
+			CHECK_VK(vkCreateSemaphore(myDevice, &semaphoreInfo, nullptr, &myRenderCompleteSemaphores[frameIt]));
 
 			// IMGUI uses primary command buffer only
-			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[bufferIt];
+			ImGui_ImplVulkanH_FrameData* fd = &myWindowData->Frames[frameIt];
 			fd->CommandPool = myCommandPools[0];
-			fd->CommandBuffer = myCommandBuffers[myCommandBufferThreadCount * bufferIt];
-			fd->Fence = myFrameFences[bufferIt];
-			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[bufferIt];
-			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[bufferIt];
+			fd->CommandBuffer = myCommandBuffers[myCommandBufferThreadCount * frameIt];
+			fd->Fence = myFrameFences[frameIt];
+			fd->ImageAcquiredSemaphore = myImageAcquiredSemaphores[frameIt];
+			fd->RenderCompleteSemaphore = myRenderCompleteSemaphores[frameIt];
 		}
 		//ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(myDevice, myQueueFamilyIndex, myWindowData.get(), nullptr);
 
@@ -1473,6 +1473,7 @@ private:
 			secBeginInfo.pInheritanceInfo = &inherit;
 			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
 
+			// bind pipeline and vertex/index buffers used drawing spinning logos
 			vkCmdBindPipeline(
 				cmd,
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1544,6 +1545,7 @@ private:
 			});
 		}
 
+		// end secondary command buffers
 		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
 		{
 			VkCommandBuffer& cmd =
@@ -1580,7 +1582,7 @@ private:
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
 
-		// Record Imgui Draw Data and draw funcs into command buffer
+		// Record Imgui Draw Data and draw funcs into primary command buffer
 		{
 			VkRenderPassBeginInfo beginInfo = {};
 			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1597,7 +1599,7 @@ private:
 			vkCmdEndRenderPass(newFrame->CommandBuffer);
 		}
 
-		// Submit command buffer
+		// Submit primary command buffer
 		{
 			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			VkSubmitInfo submitInfo = {};
@@ -1632,20 +1634,20 @@ private:
 	{
 		//ImGui_ImplVulkanH_DestroyWindowDataCommandBuffers(myDevice, myWindowData.get(), nullptr);
 		{
-			for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
+			for (uint32_t frameIt = 0; frameIt < myFrameCount; frameIt++)
 			{
-				vkDestroyFence(myDevice, myFrameFences[bufferIt], nullptr);
-				vkDestroySemaphore(myDevice, myImageAcquiredSemaphores[bufferIt], nullptr);
-				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[bufferIt], nullptr);
+				vkDestroyFence(myDevice, myFrameFences[frameIt], nullptr);
+				vkDestroySemaphore(myDevice, myImageAcquiredSemaphores[frameIt], nullptr);
+				vkDestroySemaphore(myDevice, myRenderCompleteSemaphores[frameIt], nullptr);
 			}
 
-			std::vector<VkCommandBuffer> threadCommandBuffers(myBufferCount);
+			std::vector<VkCommandBuffer> threadCommandBuffers(myFrameCount);
 			for (uint32_t cmdIt = 0; cmdIt < myCommandBufferThreadCount; cmdIt++)
 			{
-				for (uint32_t bufferIt = 0; bufferIt < myBufferCount; bufferIt++)
-					threadCommandBuffers[bufferIt] = myCommandBuffers[myCommandBufferThreadCount * bufferIt + cmdIt];
+				for (uint32_t frameIt = 0; frameIt < myFrameCount; frameIt++)
+					threadCommandBuffers[frameIt] = myCommandBuffers[myCommandBufferThreadCount * frameIt + cmdIt];
 
-				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myBufferCount, threadCommandBuffers.data());
+				vkFreeCommandBuffers(myDevice, myCommandPools[cmdIt], myFrameCount, threadCommandBuffers.data());
 				vkDestroyCommandPool(myDevice, myCommandPools[cmdIt], nullptr);
 			}
 		}
@@ -1782,17 +1784,17 @@ private:
 	VkImageView myDepthImageView = VK_NULL_HANDLE;
 
 	std::vector<VkCommandPool> myCommandPools; // count = [threadCount]
-	std::vector<VkCommandBuffer> myCommandBuffers; // count = [threadCount*bufferCount] [f0cb0 f0cb1 f1cb0 f1cb1 f2cb0 f1cb1 ...]
-	std::vector<VkFence> myFrameFences; // count = [bufferCount]
-	std::vector<VkSemaphore> myImageAcquiredSemaphores; // count = [bufferCount]
-	std::vector<VkSemaphore> myRenderCompleteSemaphores; // count = [bufferCount]
+	std::vector<VkCommandBuffer> myCommandBuffers; // count = [frameCount*threadCount] [f0cb0 f0cb1 f1cb0 f1cb1 f2cb0 f2cb1 ...]
+	std::vector<VkFence> myFrameFences; // count = [frameCount]
+	std::vector<VkSemaphore> myImageAcquiredSemaphores; // count = [frameCount]
+	std::vector<VkSemaphore> myRenderCompleteSemaphores; // count = [frameCount]
 
 	std::unique_ptr<ImGui_ImplVulkanH_WindowData> myWindowData;
 	std::vector<ImFont*> myFonts;
 
 	const std::string myResourcePath;
 
-	uint32_t myBufferCount = 0;
+	uint32_t myFrameCount = 0;
 	uint32_t myCommandBufferThreadCount = 0;
 	int myRequestedCommandBufferThreadCount = 0;
 
