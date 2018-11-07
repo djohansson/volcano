@@ -118,17 +118,3 @@ int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device, SwapChainInf
 
 	return -1;
 }
-
-void readSPIRVFile(const std::string& filename, std::vector<char>& outData)
-{
-	std::ifstream file(filename, std::ios::ate | std::ios::binary);
-	if (!file.is_open())
-		throw std::runtime_error("failed to open file!");
-
-	auto fileSize = file.tellg();
-	outData.resize(static_cast<size_t>(fileSize));
-
-	file.seekg(0);
-	file.read(outData.data(), fileSize);
-	file.close();
-}

@@ -171,6 +171,7 @@ Compiler('Compiler-Clang')
 				+ ' -I$ProjectPath$../tinyobjloader/experimental'
 				+ ' -I$ProjectPath$../imgui'
 				+ ' -I$ProjectPath$../glfw/include'
+				+ ' -I$ProjectPath$../cereal/include'
 				+ ' -DVOLCANO_USE_GLFW'
 				+ ' -Wunused-function'
 	#if __WINDOWS__ // to avoid errors in windows headers

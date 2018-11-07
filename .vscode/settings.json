@@ -58,5 +58,6 @@
 		"xutility": "cpp",
 		"deque": "cpp"
 	},
-	"C_Cpp.intelliSenseEngineFallback": "Enabled"
+	"C_Cpp.intelliSenseEngineFallback": "Enabled",
+	"cmake.configureOnOpen": false
 }

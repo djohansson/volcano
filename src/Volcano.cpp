@@ -59,6 +59,10 @@
 #include <imgui.h>
 #include <examples/imgui_impl_vulkan.h>
 
+#include <cereal/cereal.hpp>
+#include <cereal/types/vector.hpp>
+#include <cereal/archives/portable_binary.hpp>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -67,6 +71,7 @@
 #if defined(__WINDOWS__)
 #include <execution>
 #endif
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -113,7 +118,14 @@ struct Vertex
 		attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 		return attributeDescriptions;
 	}
+
+	template <class Archive>
+	void serialize(Archive & ar)
+	{
+		ar(pos.data.data, color.data.data, texCoord.data.data);
+	}
 };
+
 
 namespace std
 {
@@ -128,13 +140,13 @@ namespace std
     };
 }
 
-struct VulkanLogo
-{
-	static const Vertex ourVertices[8];
-	static const uint32_t ourIndices[12];
-};
+// struct Quad
+// {
+// 	static const Vertex ourVertices[8];
+// 	static const uint32_t ourIndices[12];
+// };
 
-struct Image
+struct Texture
 {
 	VkImage myImage = VK_NULL_HANDLE;
 	VmaAllocation myImageMemory = VK_NULL_HANDLE;
@@ -147,28 +159,27 @@ struct Model
 	VmaAllocation myVertexBufferMemory = VK_NULL_HANDLE;
 	VkBuffer myIndexBuffer = VK_NULL_HANDLE;
 	VmaAllocation myIndexBufferMemory = VK_NULL_HANDLE;
-
-	uint32_t myIndexCount = 0;
+	uint32_t indexCount;
 };
 
-const Vertex VulkanLogo::ourVertices[] =
-{
-	{ { -1.0f, -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { -1.0f, 1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
-	{ { 1.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { 1.0f, -1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } },
+// const Vertex Quad::ourVertices[] =
+// {
+// 	{ { -1.0f, -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
+// 	{ { -1.0f, 1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
+// 	{ { 1.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
+// 	{ { 1.0f, -1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } },
 
-	{ { -1.0f, -1.0f, -1.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { -1.0f, 1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
-	{ { 1.0f, 1.0f, -1.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } }
-};
+// 	{ { -1.0f, -1.0f, -1.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
+// 	{ { -1.0f, 1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
+// 	{ { 1.0f, 1.0f, -1.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
+// 	{ { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } }
+// };
 
-const uint32_t VulkanLogo::ourIndices[] =
-{
-	0, 1, 2, 2, 3, 0,
-	4, 5, 6, 6, 7, 4
-};
+// const uint32_t Quad::ourIndices[] =
+// {
+// 	0, 1, 2, 2, 3, 0,
+// 	4, 5, 6, 6, 7, 4
+// };
 
 class VulkanApplication
 {
@@ -178,6 +189,8 @@ public:
 		, myCommandBufferThreadCount(clamp(4, 2, 32))
 		, myRequestedCommandBufferThreadCount(myCommandBufferThreadCount)
 	{
+		assert(std::filesystem::is_directory(myResourcePath));
+
 		createInstance();
 		createDebugCallback();
 		
@@ -193,148 +206,19 @@ public:
 
 		createFrameResources(framebufferWidth, framebufferHeight);
 
-		{
-		#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
-			using namespace tinyobj_opt;
-		#else
-			using namespace tinyobj;
-		#endif
+		loadModel("chalet.obj", myHouseModel);
 
-			attrib_t attrib;
-			std::vector<shape_t> shapes;
-			std::vector<material_t> materials;
-			
-			std::string filename = myResourcePath + std::string("models/chalet.obj");
+		// {
+		// 	createDeviceLocalBuffer(Quad::ourVertices, static_cast<uint32_t>(sizeof_array(Quad::ourVertices)),
+		// 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myQuadModel.myVertexBuffer,
+		// 		myQuadModel.myVertexBufferMemory);
+		// 	createDeviceLocalBuffer(Quad::ourIndices, static_cast<uint32_t>(sizeof_array(Quad::ourIndices)),
+		// 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myQuadModel.myIndexBuffer,
+		// 		myQuadModel.myIndexBufferMemory);
+		// }
 
-			std::ifstream file(filename.c_str(), std::ios::in|std::ios::binary);
-			file.ignore(std::numeric_limits<std::streamsize>::max());
-			file.clear(); // Since ignore will have set eof.
-			file.seekg(0, std::ios_base::beg);
-
-			{
-			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
-				std::streambuf* raw_buffer = file.rdbuf();
-				std::streamsize bufferSize = file.gcount();
-				std::unique_ptr<char[]> buffer = std::make_unique<char[]>(bufferSize);
-				raw_buffer->sgetn(buffer.get(), bufferSize);
-				LoadOption option;
-				if (!parseObj(&attrib, &shapes, &materials, buffer.get(), bufferSize, option))
-					throw std::runtime_error();
-			#else
-				std::string warn, err;
-				if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, &file))
-					throw std::runtime_error(err);
-			#endif
-			}
-		
-			uint32_t indexCount = 0;
-			for (const auto& shape : shapes)
-			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
-				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
-					indexCount += attrib.face_num_verts[faceOffset];
-			#else
-				indexCount += shape.mesh.indices.size();
-			#endif
-			
-			std::vector<Vertex> vertices;
-			std::vector<uint32_t> indices;
-			std::unordered_map<Vertex, uint32_t> uniqueVertices;
-
-			vertices.reserve(indexCount / 3); // guesstimate
-			indices.reserve(indexCount);
-
-			for (const auto& shape : shapes)
-			{
-			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
-				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
-				{
-					const index_t& index = attrib.indices[faceOffset];
-			#else
-				for (const auto& index : shape.mesh.indices)
-				{
-			#endif
-					Vertex vertex = {};
-
-					vertex.pos =
-					{
-						attrib.vertices[3 * index.vertex_index + 0],
-						attrib.vertices[3 * index.vertex_index + 1],
-						attrib.vertices[3 * index.vertex_index + 2]
-					};
-
-					vertex.texCoord =
-					{
-    					attrib.texcoords[2 * index.texcoord_index + 0],
-    					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-					};
-
-					vertex.color = { 1.0f, 1.0f, 1.0f };
-
-					if (uniqueVertices.count(vertex) == 0)
-					{
-						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-						vertices.push_back(vertex);
-					}
-
-					indices.push_back(uniqueVertices[vertex]);
-				}
-			}
-
-			createDeviceLocalBuffer(vertices.data(), static_cast<uint32_t>(vertices.size()),
-				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myHouseModel.myVertexBuffer,
-				myHouseModel.myVertexBufferMemory);
-			
-			createDeviceLocalBuffer(indices.data(), static_cast<uint32_t>(indices.size()),
-				VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myHouseModel.myIndexBuffer,
-				myHouseModel.myIndexBufferMemory);
-
-			myHouseModel.myIndexCount = static_cast<uint32_t>(indices.size());
-		}
-
-		{
-			int x, y, n;
-			unsigned char* data =
-				stbi_load((myResourcePath + std::string("images/chalet.jpg")).c_str(),
-					&x, &y, &n, STBI_rgb_alpha);
-
-			if (data == nullptr)
-				throw std::runtime_error("Failed to load image.");
-
-			createDeviceLocalImage2D(data, x, y, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, myHouseImage.myImage,
-				myHouseImage.myImageMemory);
-
-			stbi_image_free(data);
-
-			myHouseImage.myImageView = createImageView2D(myHouseImage.myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-		}
-
-		{
-			createDeviceLocalBuffer(VulkanLogo::ourVertices, static_cast<uint32_t>(sizeof_array(VulkanLogo::ourVertices)),
-				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVulkanLogoModel.myVertexBuffer,
-				myVulkanLogoModel.myVertexBufferMemory);
-			createDeviceLocalBuffer(VulkanLogo::ourIndices, static_cast<uint32_t>(sizeof_array(VulkanLogo::ourIndices)),
-				VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myVulkanLogoModel.myIndexBuffer,
-				myVulkanLogoModel.myIndexBufferMemory);
-
-			myVulkanLogoModel.myIndexCount = static_cast<uint32_t>(sizeof_array(VulkanLogo::ourIndices));
-		}
-
-		{
-			int x, y, n;
-			unsigned char* data =
-				stbi_load((myResourcePath + std::string("images/2018-Vulkan-small-badge.png")).c_str(),
-					&x, &y, &n, STBI_rgb_alpha);
-
-			if (data == nullptr)
-				throw std::runtime_error("Failed to load image.");
-
-			createDeviceLocalImage2D(data, x, y, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, myVulkanLogoImage.myImage,
-				myVulkanLogoImage.myImageMemory);
-
-			stbi_image_free(data);
-
-			myVulkanLogoImage.myImageView = createImageView2D(myVulkanLogoImage.myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-		}
+		loadTexture("chalet.jpg", myHouseImage);
+		loadTexture("2018-Vulkan-small-badge.png", myVulkanImage);
 
 		// create uniform buffer
 		createBuffer(
@@ -364,8 +248,12 @@ public:
 		// update input dependent state
 		{
 			ImGuiIO& io = ImGui::GetIO();
-			if (io.KeysDown[io.KeyMap[ImGuiKey_Escape]])
+
+			static bool escBufferState = false;
+			bool escState = io.KeysDown[io.KeyMap[ImGuiKey_Escape]];
+			if (escState && !escBufferState)
 				myUIEnableFlag = !myUIEnableFlag;
+			escBufferState = escState;
 
 			if (myCommandBufferThreadCount != myRequestedCommandBufferThreadCount)
 				myCreateFrameResourcesFlag = true;
@@ -440,6 +328,202 @@ public:
 	}
 
 private:
+
+	void loadModel(const char* filename, Model& outModel) const
+	{
+		std::filesystem::path modelFile(myResourcePath);
+		modelFile = std::filesystem::absolute(modelFile);
+
+		modelFile /= "models";
+		modelFile /= filename;
+		
+		std::filesystem::path modelFileCereal(modelFile);
+		modelFileCereal += ".cereal";
+
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
+		
+		if (std::filesystem::exists(modelFileCereal) && std::filesystem::is_regular_file(modelFileCereal))
+		{
+			std::ifstream cerealFile(modelFileCereal.c_str(), std::ios::binary);
+			cereal::PortableBinaryInputArchive archive(cerealFile);
+
+			archive(vertices, indices);
+		}
+		else if (std::filesystem::exists(modelFile) && std::filesystem::is_regular_file(modelFile))
+		{
+		#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+			using namespace tinyobj_opt;
+		#else
+			using namespace tinyobj;
+		#endif
+
+			attrib_t attrib;
+			std::vector<shape_t> shapes;
+			std::vector<material_t> materials;
+
+			std::ifstream file(modelFile.c_str(), std::ios::in|std::ios::binary);
+			file.ignore(std::numeric_limits<std::streamsize>::max());
+			file.clear(); // Since ignore will have set eof.
+			file.seekg(0, std::ios_base::beg);
+
+			{
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				std::streambuf* raw_buffer = file.rdbuf();
+				std::streamsize bufferSize = file.gcount();
+				std::unique_ptr<char[]> buffer = std::make_unique<char[]>(bufferSize);
+				raw_buffer->sgetn(buffer.get(), bufferSize);
+				LoadOption option;
+				if (!parseObj(&attrib, &shapes, &materials, buffer.get(), bufferSize, option))
+					throw std::runtime_error("Failed to load model.");
+			#else
+				std::string warn, err;
+				if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, &file))
+					throw std::runtime_error(err);
+			#endif
+			}
+		
+			uint32_t indexCount = 0;
+			for (const auto& shape : shapes)
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
+					indexCount += attrib.face_num_verts[faceOffset];
+			#else
+				indexCount += shape.mesh.indices.size();
+			#endif
+
+			std::unordered_map<Vertex, uint32_t> uniqueVertices;
+
+			vertices.reserve(indexCount / 3); // guesstimate
+			indices.reserve(indexCount);
+
+			for (const auto& shape : shapes)
+			{
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
+				{
+					const index_t& index = attrib.indices[faceOffset];
+			#else
+				for (const auto& index : shape.mesh.indices)
+				{
+			#endif
+					Vertex vertex = {};
+
+					vertex.pos =
+					{
+						attrib.vertices[3 * index.vertex_index + 0],
+						attrib.vertices[3 * index.vertex_index + 1],
+						attrib.vertices[3 * index.vertex_index + 2]
+					};
+
+					vertex.texCoord =
+					{
+						attrib.texcoords[2 * index.texcoord_index + 0],
+						1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+					};
+
+					vertex.color = { 1.0f, 1.0f, 1.0f };
+
+					if (uniqueVertices.count(vertex) == 0)
+					{
+						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+						vertices.push_back(vertex);
+					}
+
+					indices.push_back(uniqueVertices[vertex]);
+				}
+			}
+
+			std::ofstream cerealFile(modelFileCereal.c_str(), std::ios::binary);
+			cereal::PortableBinaryOutputArchive archive(cerealFile);
+
+			archive(vertices, indices);
+		}
+		else
+		{
+			throw std::runtime_error("Failed to load model.");
+		}
+
+		createDeviceLocalBuffer(
+			vertices.data(),
+			static_cast<uint32_t>(vertices.size()),
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			outModel.myVertexBuffer,
+			outModel.myVertexBufferMemory);
+			
+		createDeviceLocalBuffer(
+			indices.data(),
+			static_cast<uint32_t>(indices.size()),
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			outModel.myIndexBuffer,
+			outModel.myIndexBufferMemory);
+
+		outModel.indexCount = indices.size();
+	}
+
+	void loadTexture(const char* filename, Texture& outTexture) const
+	{
+		std::filesystem::path imageFile(myResourcePath);
+		imageFile = std::filesystem::absolute(imageFile);
+
+		imageFile /= "images";
+		imageFile /= filename;
+		
+		int x, y, n;
+		unsigned char* imageData = nullptr;
+
+		if (std::filesystem::exists(imageFile) && std::filesystem::is_regular_file(imageFile))
+		{
+			imageData = stbi_load(imageFile.string().c_str(), &x, &y, &n, STBI_rgb_alpha);
+
+			if (imageData == nullptr)
+				throw std::runtime_error("Failed to load image.");
+
+			createDeviceLocalImage2D(
+				imageData,
+				x,
+				y,
+				VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_USAGE_SAMPLED_BIT,
+				outTexture.myImage,
+				outTexture.myImageMemory);
+
+			stbi_image_free(imageData);
+
+			outTexture.myImageView = createImageView2D(myHouseImage.myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		}
+		else
+		{
+			throw std::runtime_error("Failed to load image.");
+		}
+	}
+
+	void loadSPIRVFile(const char* filename, std::vector<char>& outData)
+	{
+		std::filesystem::path spirvFile(myResourcePath);
+		spirvFile = std::filesystem::absolute(spirvFile);
+
+		spirvFile /= "shaders";
+		spirvFile /= "spir-v";
+		spirvFile /= filename;
+
+		if (std::filesystem::exists(spirvFile) && std::filesystem::is_regular_file(spirvFile))
+		{
+			std::ifstream file(spirvFile.c_str(), std::ios::ate | std::ios::binary);
+
+			auto fileSize = file.tellg();
+			outData.resize(static_cast<size_t>(fileSize));
+
+			file.seekg(0);
+			file.read(outData.data(), fileSize);
+			file.close();
+		}
+		else
+		{
+			throw std::runtime_error("failed to open file!");
+		}
+	}
+
 	void createInstance()
 	{
 		CHECK_VK(volkInitialize());
@@ -833,8 +917,7 @@ private:
 
 		CHECK_VK(myDeviceTable.vkAllocateDescriptorSets(myDevice, &allocInfo, &myDescriptorSet));
 
-		//updateDescriptorSet(myUniformBuffer, myHouseImage.myImageView);
-		updateDescriptorSet(myUniformBuffer, myVulkanLogoImage.myImageView);
+		updateDescriptorSet(myUniformBuffer, myHouseImage.myImageView);
 	}
 
 	void updateDescriptorSet(VkBuffer buffer, VkImageView imageView)
@@ -929,7 +1012,7 @@ private:
 	void createGraphicsPipelines()
 	{
 		std::vector<char> vsCode;
-		readSPIRVFile((myResourcePath + std::string("shaders/spir-v/vert.spv")).c_str(), vsCode);
+		loadSPIRVFile("vert.spv", vsCode);
 
 		VkShaderModuleCreateInfo vsCreateInfo = {};
 		vsCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -946,7 +1029,7 @@ private:
 		vsStageInfo.pName = "main";
 
 		std::vector<char> fsCode;
-		readSPIRVFile((myResourcePath + std::string("shaders/spir-v/frag.spv")).c_str(), fsCode);
+		loadSPIRVFile("frag.spv", fsCode);
 
 		VkShaderModuleCreateInfo fsCreateInfo = {};
 		fsCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1132,7 +1215,7 @@ private:
 		myDeviceTable.vkDestroyShaderModule(myDevice, fsModule, nullptr);
 	}
 
-	VkCommandBuffer beginSingleTimeCommands()
+	VkCommandBuffer beginSingleTimeCommands() const
 	{
 		VkCommandPool commandPool = myWindowData->Frames[myWindowData->FrameIndex].CommandPool;
 		VkCommandBuffer commandBuffer =
@@ -1148,7 +1231,7 @@ private:
 		return commandBuffer;
 	}
 
-	void endSingleTimeCommands(VkCommandBuffer commandBuffer)
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer) const
 	{
 		VkSubmitInfo endInfo = {};
 		endInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1159,7 +1242,7 @@ private:
 		CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
 	}
 
-	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) const
 	{
 		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1173,7 +1256,7 @@ private:
 	}
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags flags,
-		VkBuffer& outBuffer, VmaAllocation& outBufferMemory)
+		VkBuffer& outBuffer, VmaAllocation& outBufferMemory) const
 	{
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1194,7 +1277,7 @@ private:
 	template <typename T>
 	void createDeviceLocalBuffer(const T* bufferData, uint32_t bufferElementCount,
 		VkBufferUsageFlags usage, VkBuffer& outBuffer,
-		VmaAllocation& outBufferMemory)
+		VmaAllocation& outBufferMemory) const
 	{
 		assert(bufferData != nullptr);
 		assert(bufferElementCount > 0);
@@ -1221,7 +1304,7 @@ private:
 	}
 
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-		VkImageLayout newLayout)
+		VkImageLayout newLayout) const
 	{
 		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1294,7 +1377,7 @@ private:
 		endSingleTimeCommands(commandBuffer);
 	}
 
-	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const
 	{
 		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1317,7 +1400,7 @@ private:
 
 	void createImage2D(uint32_t width, uint32_t height, VkFormat format,
 		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryFlags,
-		VkImage& outImage, VmaAllocation& outImageMemory)
+		VkImage& outImage, VmaAllocation& outImageMemory) const
 	{
 		VkImageCreateInfo imageInfo = {};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1350,7 +1433,7 @@ private:
 	template <typename T>
 	void createDeviceLocalImage2D(const T* imageData, uint32_t width, uint32_t height,
 		VkFormat format, VkImageUsageFlags usage,
-		VkImage& outImage, VmaAllocation& outImageMemory)
+		VkImage& outImage, VmaAllocation& outImageMemory) const
 	{
 		uint32_t pixelSizeBytes = getFormatSize(format); // todo
 		VkDeviceSize imageSize = width * height * pixelSizeBytes;
@@ -1379,7 +1462,7 @@ private:
 		vmaDestroyBuffer(myAllocator, stagingBuffer, stagingBufferMemory);
 	}
 
-	VkImageView createImageView2D(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+	VkImageView createImageView2D(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const
 	{
 		VkImageView imageView;
 		VkImageViewCreateInfo viewInfo = {};
@@ -1441,18 +1524,28 @@ private:
 		config.PixelSnapH = false;
 
 		io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Cousine-Regular.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/DroidSans.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Karla-Regular.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/ProggyClean.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/ProggyTiny.ttf")).c_str(), 16.0f, &config));
-		myFonts.push_back(io.Fonts->AddFontFromFileTTF(
-			(myResourcePath + std::string("fonts/Roboto-Medium.ttf")).c_str(), 16.0f, &config));
+
+		std::filesystem::path fontPath(myResourcePath);
+		fontPath = std::filesystem::absolute(fontPath);
+		fontPath /= "fonts";
+
+		fontPath /= "Cousine-Regular.ttf";
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
+		
+		fontPath.replace_filename("DroidSans.ttf");
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
+
+		fontPath.replace_filename("Karla-Regular.ttf");
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
+
+		fontPath.replace_filename("ProggyClean.ttf");
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
+
+		fontPath.replace_filename("ProggyTiny.ttf");
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
+
+		fontPath.replace_filename("Roboto-Medium.ttf");
+		myFonts.push_back(io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &config));
 
 		// Setup style
 		ImGui::StyleColorsClassic();
@@ -1581,9 +1674,7 @@ private:
 		if (result == VK_SUBOPTIMAL_KHR)
 			return; // not much we can do
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
-			ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(
-				myPhysicalDevice, myDevice, myWindowData.get(), nullptr, myWindowData->Width,
-				myWindowData->Height);
+			myCreateFrameResourcesFlag = true;
 		else if (result != VK_SUCCESS)
 			throw std::runtime_error("failed to flip swap chain image!");
 	}
@@ -1714,11 +1805,11 @@ private:
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
 				myGraphicsPipelines.data[segmentIt & 1]);
 			
-			VkBuffer vertexBuffers[] = { (segmentIt & 1) ? myVulkanLogoModel.myVertexBuffer : myHouseModel.myVertexBuffer };
+			VkBuffer vertexBuffers[] = { myHouseModel.myVertexBuffer };
 			VkDeviceSize vertexOffsets[] = { 0 };
 
 			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, vertexOffsets);
-			vkCmdBindIndexBuffer(cmd, (segmentIt & 1) ? myVulkanLogoModel.myIndexBuffer : myHouseModel.myIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(cmd, myHouseModel.myIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
 		// draw spinning geometry using secondary command buffers
@@ -1782,7 +1873,7 @@ private:
 						vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
 					};
 
-					drawModel(cmd, i * dx, j * dy, dx, dy, (segmentIt & 1) ? myVulkanLogoModel.myIndexCount : myHouseModel.myIndexCount);
+					drawModel(cmd, i * dx, j * dy, dx, dy, myHouseModel.indexCount);
 				}
 			});
 		}
@@ -1918,11 +2009,11 @@ private:
 		vmaDestroyBuffer(myAllocator, myUniformBuffer, myUniformBufferMemory);
 		
 		{
-			vmaDestroyBuffer(myAllocator, myVulkanLogoModel.myVertexBuffer, myVulkanLogoModel.myVertexBufferMemory);
-			vmaDestroyBuffer(myAllocator, myVulkanLogoModel.myIndexBuffer, myVulkanLogoModel.myIndexBufferMemory);
+			// vmaDestroyBuffer(myAllocator, myQuadModel.myVertexBuffer, myQuadModel.myVertexBufferMemory);
+			// vmaDestroyBuffer(myAllocator, myQuadModel.myIndexBuffer, myQuadModel.myIndexBufferMemory);
 
-			vmaDestroyImage(myAllocator, myVulkanLogoImage.myImage, myVulkanLogoImage.myImageMemory);
-			myDeviceTable.vkDestroyImageView(myDevice, myVulkanLogoImage.myImageView, nullptr);
+			vmaDestroyImage(myAllocator, myVulkanImage.myImage, myVulkanImage.myImageMemory);
+			myDeviceTable.vkDestroyImageView(myDevice, myVulkanImage.myImageView, nullptr);
 
 			vmaDestroyBuffer(myAllocator, myHouseModel.myVertexBuffer, myHouseModel.myVertexBufferMemory);
 			vmaDestroyBuffer(myAllocator, myHouseModel.myIndexBuffer, myHouseModel.myIndexBufferMemory);
@@ -2000,12 +2091,12 @@ private:
 	std::unique_ptr<ImGui_ImplVulkanH_WindowData> myWindowData;
 	std::vector<ImFont*> myFonts;
 
-	Model myVulkanLogoModel;
+	//Model myQuadModel;
 	Model myHouseModel;
-	Image myVulkanLogoImage;
-	Image myHouseImage;
+	Texture myVulkanImage;
+	Texture myHouseImage;
 
-	const std::string myResourcePath;
+	std::filesystem::path myResourcePath;
 
 	uint32_t myFrameCount = 0;
 	uint32_t myCommandBufferThreadCount = 0;
@@ -2014,7 +2105,7 @@ private:
 	bool myUIEnableFlag = false;
 	bool myCreateFrameResourcesFlag = false;
 
-	static constexpr uint32_t NX = 2;
+	static constexpr uint32_t NX = 1;
 	static constexpr uint32_t NY = 1;
 };
 

@@ -67,5 +67,3 @@ VkFormat findSupportedFormat(
 	VkFormatFeatureFlags features);
 
 int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device, SwapChainInfo& outSwapChainInfo);
-
-void readSPIRVFile(const std::string& filename, std::vector<char>& outData);
