@@ -35,11 +35,23 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+//#define TINYOBJLOADER_USE_EXPERIMENTAL
+
+#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+#define TINYOBJ_LOADER_OPT_IMPLEMENTATION
+#include <experimental/tinyobj_loader_opt.h>
+#else
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+#endif
+
 //#define GLM_FORCE_MESSAGES
+#define GLM_LANG_STL11_FORCED
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
 #include <glm/gtx/matrix_interpolation.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
@@ -60,9 +72,103 @@
 #include <numeric>
 #include <stdexcept>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+struct Vertex
+{
+	glm::vec3 pos;
+	glm::vec3 color;
+	glm::vec2 texCoord;
+
+	inline bool operator==(const Vertex& other) const
+	{
+    	return pos == other.pos && color == other.color && texCoord == other.texCoord;
+	}
+
+	static VkVertexInputBindingDescription getBindingDescription()
+	{
+		VkVertexInputBindingDescription bindingDescription = {};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return bindingDescription;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions()
+	{
+		std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].location = 2;
+		attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+		return attributeDescriptions;
+	}
+};
+
+namespace std
+{
+    template<> struct hash<Vertex>
+	{
+        size_t operator()(Vertex const& vertex) const
+		{
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                   (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}
+
+struct VulkanLogo
+{
+	static const Vertex ourVertices[8];
+	static const uint32_t ourIndices[12];
+};
+
+struct Image
+{
+	VkImage myImage = VK_NULL_HANDLE;
+	VmaAllocation myImageMemory = VK_NULL_HANDLE;
+	VkImageView myImageView = VK_NULL_HANDLE;
+};
+
+struct Model
+{
+	VkBuffer myVertexBuffer = VK_NULL_HANDLE;
+	VmaAllocation myVertexBufferMemory = VK_NULL_HANDLE;
+	VkBuffer myIndexBuffer = VK_NULL_HANDLE;
+	VmaAllocation myIndexBufferMemory = VK_NULL_HANDLE;
+
+	uint32_t myIndexCount = 0;
+};
+
+const Vertex VulkanLogo::ourVertices[] =
+{
+	{ { -1.0f, -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
+	{ { -1.0f, 1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
+	{ { 1.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
+	{ { 1.0f, -1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } },
+
+	{ { -1.0f, -1.0f, -1.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
+	{ { -1.0f, 1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
+	{ { 1.0f, 1.0f, -1.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
+	{ { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } }
+};
+
+const uint32_t VulkanLogo::ourIndices[] =
+{
+	0, 1, 2, 2, 3, 0,
+	4, 5, 6, 6, 7, 4
+};
 
 class VulkanApplication
 {
@@ -87,28 +193,147 @@ public:
 
 		createFrameResources(framebufferWidth, framebufferHeight);
 
-		createDeviceLocalBuffer(ourVertices, static_cast<uint32_t>(sizeof_array(ourVertices)),
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVertexBuffer,
-			myVertexBufferMemory);
-		createDeviceLocalBuffer(ourIndices, static_cast<uint32_t>(sizeof_array(ourIndices)),
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myIndexBuffer,
-			myIndexBufferMemory);
+		{
+		#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+			using namespace tinyobj_opt;
+		#else
+			using namespace tinyobj;
+		#endif
 
-		// upload textures
+			attrib_t attrib;
+			std::vector<shape_t> shapes;
+			std::vector<material_t> materials;
+			
+			std::string filename = myResourcePath + std::string("models/chalet.obj");
+
+			std::ifstream file(filename.c_str(), std::ios::in|std::ios::binary);
+			file.ignore(std::numeric_limits<std::streamsize>::max());
+			file.clear(); // Since ignore will have set eof.
+			file.seekg(0, std::ios_base::beg);
+
+			{
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				std::streambuf* raw_buffer = file.rdbuf();
+				std::streamsize bufferSize = file.gcount();
+				std::unique_ptr<char[]> buffer = std::make_unique<char[]>(bufferSize);
+				raw_buffer->sgetn(buffer.get(), bufferSize);
+				LoadOption option;
+				if (!parseObj(&attrib, &shapes, &materials, buffer.get(), bufferSize, option))
+					throw std::runtime_error();
+			#else
+				std::string warn, err;
+				if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, &file))
+					throw std::runtime_error(err);
+			#endif
+			}
+		
+			uint32_t indexCount = 0;
+			for (const auto& shape : shapes)
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
+					indexCount += attrib.face_num_verts[faceOffset];
+			#else
+				indexCount += shape.mesh.indices.size();
+			#endif
+			
+			std::vector<Vertex> vertices;
+			std::vector<uint32_t> indices;
+			std::unordered_map<Vertex, uint32_t> uniqueVertices;
+
+			vertices.reserve(indexCount / 3); // guesstimate
+			indices.reserve(indexCount);
+
+			for (const auto& shape : shapes)
+			{
+			#ifdef TINYOBJLOADER_USE_EXPERIMENTAL
+				for (uint32_t faceOffset = shape.face_offset; faceOffset < (shape.face_offset + shape.length); faceOffset++)
+				{
+					const index_t& index = attrib.indices[faceOffset];
+			#else
+				for (const auto& index : shape.mesh.indices)
+				{
+			#endif
+					Vertex vertex = {};
+
+					vertex.pos =
+					{
+						attrib.vertices[3 * index.vertex_index + 0],
+						attrib.vertices[3 * index.vertex_index + 1],
+						attrib.vertices[3 * index.vertex_index + 2]
+					};
+
+					vertex.texCoord =
+					{
+    					attrib.texcoords[2 * index.texcoord_index + 0],
+    					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+					};
+
+					vertex.color = { 1.0f, 1.0f, 1.0f };
+
+					if (uniqueVertices.count(vertex) == 0)
+					{
+						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+						vertices.push_back(vertex);
+					}
+
+					indices.push_back(uniqueVertices[vertex]);
+				}
+			}
+
+			createDeviceLocalBuffer(vertices.data(), static_cast<uint32_t>(vertices.size()),
+				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myHouseModel.myVertexBuffer,
+				myHouseModel.myVertexBufferMemory);
+			
+			createDeviceLocalBuffer(indices.data(), static_cast<uint32_t>(indices.size()),
+				VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myHouseModel.myIndexBuffer,
+				myHouseModel.myIndexBufferMemory);
+
+			myHouseModel.myIndexCount = static_cast<uint32_t>(indices.size());
+		}
+
+		{
+			int x, y, n;
+			unsigned char* data =
+				stbi_load((myResourcePath + std::string("images/chalet.jpg")).c_str(),
+					&x, &y, &n, STBI_rgb_alpha);
+
+			if (data == nullptr)
+				throw std::runtime_error("Failed to load image.");
+
+			createDeviceLocalImage2D(data, x, y, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, myHouseImage.myImage,
+				myHouseImage.myImageMemory);
+
+			stbi_image_free(data);
+
+			myHouseImage.myImageView = createImageView2D(myHouseImage.myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		}
+
+		{
+			createDeviceLocalBuffer(VulkanLogo::ourVertices, static_cast<uint32_t>(sizeof_array(VulkanLogo::ourVertices)),
+				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, myVulkanLogoModel.myVertexBuffer,
+				myVulkanLogoModel.myVertexBufferMemory);
+			createDeviceLocalBuffer(VulkanLogo::ourIndices, static_cast<uint32_t>(sizeof_array(VulkanLogo::ourIndices)),
+				VK_BUFFER_USAGE_INDEX_BUFFER_BIT, myVulkanLogoModel.myIndexBuffer,
+				myVulkanLogoModel.myIndexBufferMemory);
+
+			myVulkanLogoModel.myIndexCount = static_cast<uint32_t>(sizeof_array(VulkanLogo::ourIndices));
+		}
+
 		{
 			int x, y, n;
 			unsigned char* data =
 				stbi_load((myResourcePath + std::string("images/2018-Vulkan-small-badge.png")).c_str(),
 					&x, &y, &n, STBI_rgb_alpha);
 
-			assert(data != nullptr);
+			if (data == nullptr)
+				throw std::runtime_error("Failed to load image.");
 
-			createDeviceLocalImage2D(data, x, y, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, myImage,
-				myImageMemory);
+			createDeviceLocalImage2D(data, x, y, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, myVulkanLogoImage.myImage,
+				myVulkanLogoImage.myImageMemory);
 
 			stbi_image_free(data);
 
-			myImageView = createImageView2D(myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+			myVulkanLogoImage.myImageView = createImageView2D(myVulkanLogoImage.myImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 		}
 
 		// create uniform buffer
@@ -136,8 +361,18 @@ public:
 
 	void draw()
 	{
-		// todo: route all events that needs frame resource re-creation here
-		if (myCommandBufferThreadCount != myRequestedCommandBufferThreadCount)
+		// update input dependent state
+		{
+			ImGuiIO& io = ImGui::GetIO();
+			if (io.KeysDown[io.KeyMap[ImGuiKey_Escape]])
+				myUIEnableFlag = !myUIEnableFlag;
+
+			if (myCommandBufferThreadCount != myRequestedCommandBufferThreadCount)
+				myCreateFrameResourcesFlag = true;
+		}
+		
+		// re-create frame resources if needed
+		if (myCreateFrameResourcesFlag)
 		{
 			CHECK_VK(myDeviceTable.vkDeviceWaitIdle(myDevice));
 		
@@ -149,6 +384,7 @@ public:
 		}
 
 		// todo: run this at the same time as secondary command buffer recording
+		if (myUIEnableFlag)
 		{
 			ImGui_ImplVulkan_NewFrame();
 			ImGui::NewFrame();
@@ -597,14 +833,20 @@ private:
 
 		CHECK_VK(myDeviceTable.vkAllocateDescriptorSets(myDevice, &allocInfo, &myDescriptorSet));
 
+		//updateDescriptorSet(myUniformBuffer, myHouseImage.myImageView);
+		updateDescriptorSet(myUniformBuffer, myVulkanLogoImage.myImageView);
+	}
+
+	void updateDescriptorSet(VkBuffer buffer, VkImageView imageView)
+	{
 		VkDescriptorBufferInfo bufferInfo = {};
-		bufferInfo.buffer = myUniformBuffer;
+		bufferInfo.buffer = buffer;
 		bufferInfo.offset = 0;
 		bufferInfo.range = VK_WHOLE_SIZE;
 
 		VkDescriptorImageInfo imageInfo = {};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = myImageView;
+		imageInfo.imageView = imageView;
 		imageInfo.sampler = mySampler;
 
 		std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
@@ -743,8 +985,8 @@ private:
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = { vsStageInfo, fsStageInfo };
 
-		auto bindingDescription = SimpleVertex2D::getBindingDescription();
-		auto attributeDescriptions = SimpleVertex2D::getAttributeDescriptions();
+		auto bindingDescription = Vertex::getBindingDescription();
+		auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -786,7 +1028,7 @@ private:
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 		rasterizer.lineWidth = 1.0f;
 		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
 		rasterizer.depthBiasEnable = VK_FALSE;
 		rasterizer.depthBiasConstantFactor = 0.0f;
 		rasterizer.depthBiasClamp = 0.0f;
@@ -1444,15 +1686,8 @@ private:
 		}
 
 		// setup draw parameters
-		uint32_t dx = myWindowData->Width / NX;
-		uint32_t dy = myWindowData->Height / NY;
-
 		constexpr uint32_t drawCount = NX * NY;
 		uint32_t segmentCount = std::max(myCommandBufferThreadCount - 1u, 1u);
-		uint32_t segmentDrawCount = drawCount / segmentCount;
-
-		if (drawCount % segmentCount)
-			segmentDrawCount += 1;
 
 		// begin secondary command buffers
 		for (uint32_t segmentIt = 0; segmentIt < segmentCount; segmentIt++)
@@ -1479,15 +1714,22 @@ private:
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
 				myGraphicsPipelines.data[segmentIt & 1]);
 			
-			VkBuffer vertexBuffers[] = { myVertexBuffer };
+			VkBuffer vertexBuffers[] = { (segmentIt & 1) ? myVulkanLogoModel.myVertexBuffer : myHouseModel.myVertexBuffer };
 			VkDeviceSize vertexOffsets[] = { 0 };
 
 			vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, vertexOffsets);
-			vkCmdBindIndexBuffer(cmd, myIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(cmd, (segmentIt & 1) ? myVulkanLogoModel.myIndexBuffer : myHouseModel.myIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
-		// draw spinning logos using secondary command buffers
+		// draw spinning geometry using secondary command buffers
 		{
+			uint32_t segmentDrawCount = drawCount / segmentCount;
+			if (drawCount % segmentCount)
+				segmentDrawCount += 1;
+
+			uint32_t dx = myWindowData->Width / NX;
+			uint32_t dy = myWindowData->Height / NY;
+
 			std::array<uint32_t, 128> seq;
 			std::iota(seq.begin(), seq.begin() + segmentCount, 0);
 			std::for_each_n(
@@ -1510,7 +1752,7 @@ private:
 					uint32_t i = n % NX;
 					uint32_t j = n / NX;
 
-					auto drawSpinningLogo = [this, &n](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height)
+					auto drawModel = [this, &n](VkCommandBuffer cmd, int32_t x, int32_t y, int32_t width, int32_t height, uint32_t indexCount)
 					{
 						VkViewport viewport = {};
 						viewport.x = static_cast<float>(x);
@@ -1537,10 +1779,10 @@ private:
 
 						vkCmdSetViewport(cmd, 0, 1, &viewport);
 						vkCmdSetScissor(cmd, 0, 1, &scissor);
-						vkCmdDrawIndexed(cmd, static_cast<uint32_t>(sizeof_array(ourIndices)), 1, 0, 0, 0);
+						vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
 					};
 
-					drawSpinningLogo(cmd, i * dx, j * dy, dx, dy);
+					drawModel(cmd, i * dx, j * dy, dx, dy, (segmentIt & 1) ? myVulkanLogoModel.myIndexCount : myHouseModel.myIndexCount);
 				}
 			});
 		}
@@ -1583,6 +1825,7 @@ private:
 		}
 
 		// Record Imgui Draw Data and draw funcs into primary command buffer
+		if (myUIEnableFlag)
 		{
 			VkRenderPassBeginInfo beginInfo = {};
 			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1673,11 +1916,20 @@ private:
 		ImGui::DestroyContext();
 
 		vmaDestroyBuffer(myAllocator, myUniformBuffer, myUniformBufferMemory);
-		vmaDestroyBuffer(myAllocator, myVertexBuffer, myVertexBufferMemory);
-		vmaDestroyBuffer(myAllocator, myIndexBuffer, myIndexBufferMemory);
 		
-		vmaDestroyImage(myAllocator, myImage, myImageMemory);
-		myDeviceTable.vkDestroyImageView(myDevice, myImageView, nullptr);
+		{
+			vmaDestroyBuffer(myAllocator, myVulkanLogoModel.myVertexBuffer, myVulkanLogoModel.myVertexBufferMemory);
+			vmaDestroyBuffer(myAllocator, myVulkanLogoModel.myIndexBuffer, myVulkanLogoModel.myIndexBufferMemory);
+
+			vmaDestroyImage(myAllocator, myVulkanLogoImage.myImage, myVulkanLogoImage.myImageMemory);
+			myDeviceTable.vkDestroyImageView(myDevice, myVulkanLogoImage.myImageView, nullptr);
+
+			vmaDestroyBuffer(myAllocator, myHouseModel.myVertexBuffer, myHouseModel.myVertexBufferMemory);
+			vmaDestroyBuffer(myAllocator, myHouseModel.myIndexBuffer, myHouseModel.myIndexBufferMemory);
+			
+			vmaDestroyImage(myAllocator, myHouseImage.myImage, myHouseImage.myImageMemory);
+			myDeviceTable.vkDestroyImageView(myDevice, myHouseImage.myImageView, nullptr);
+		}
 
 		myDeviceTable.vkDestroySampler(myDevice, mySampler, nullptr);
 
@@ -1702,43 +1954,6 @@ private:
 		glm::mat4 proj;
 		glm::mat4 pad;
 	};
-
-	struct SimpleVertex2D
-	{
-		glm::vec3 pos;
-		glm::vec3 color;
-		glm::vec2 texCoord;
-
-		static VkVertexInputBindingDescription getBindingDescription()
-		{
-			VkVertexInputBindingDescription bindingDescription = {};
-			bindingDescription.binding = 0;
-			bindingDescription.stride = sizeof(SimpleVertex2D);
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-			return bindingDescription;
-		}
-
-		static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions()
-		{
-			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(SimpleVertex2D, pos);
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(SimpleVertex2D, color);
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(SimpleVertex2D, texCoord);
-			return attributeDescriptions;
-		}
-	};
-
-	static const SimpleVertex2D ourVertices[8];
-	static const uint16_t ourIndices[12];
 
 	VkInstance myInstance = VK_NULL_HANDLE;
 	VkDebugReportCallbackEXT myDebugCallback = VK_NULL_HANDLE;
@@ -1768,13 +1983,6 @@ private:
 
 		VkPipeline data[Count] = { VK_NULL_HANDLE };
 	} myGraphicsPipelines;
-	VkBuffer myVertexBuffer = VK_NULL_HANDLE;
-	VmaAllocation myVertexBufferMemory = VK_NULL_HANDLE;
-	VkBuffer myIndexBuffer = VK_NULL_HANDLE;
-	VmaAllocation myIndexBufferMemory = VK_NULL_HANDLE;
-	VkImage myImage = VK_NULL_HANDLE;
-	VmaAllocation myImageMemory = VK_NULL_HANDLE;
-	VkImageView myImageView = VK_NULL_HANDLE;
 	VkSampler mySampler = VK_NULL_HANDLE;
 	VkBuffer myUniformBuffer = VK_NULL_HANDLE;
 	VmaAllocation myUniformBufferMemory = VK_NULL_HANDLE;
@@ -1792,33 +2000,22 @@ private:
 	std::unique_ptr<ImGui_ImplVulkanH_WindowData> myWindowData;
 	std::vector<ImFont*> myFonts;
 
+	Model myVulkanLogoModel;
+	Model myHouseModel;
+	Image myVulkanLogoImage;
+	Image myHouseImage;
+
 	const std::string myResourcePath;
 
 	uint32_t myFrameCount = 0;
 	uint32_t myCommandBufferThreadCount = 0;
 	int myRequestedCommandBufferThreadCount = 0;
 
-	static constexpr uint32_t NX = 16;
-	static constexpr uint32_t NY = 9;
-};
+	bool myUIEnableFlag = false;
+	bool myCreateFrameResourcesFlag = false;
 
-const VulkanApplication::SimpleVertex2D VulkanApplication::ourVertices[] =
-{
-	{ { -1.0f, -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { -1.0f, 1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
-	{ { 1.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { 1.0f, -1.0f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } },
-
-	{ { -1.0f, -1.0f, -1.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { -1.0f, 1.0f, -1.0f },{ 0.0f, 1.0f, 0.0f },{ 0.0f, 1.0f } },
-	{ { 1.0f, 1.0f, -1.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { 1.0f, -1.0f, -1.0f },{ 1.0f, 1.0f, 1.0f },{ 1.0f, 0.0f } }
-};
-
-const uint16_t VulkanApplication::ourIndices[] =
-{
-	0, 1, 2, 2, 3, 0,
-	4, 5, 6, 6, 7, 4
+	static constexpr uint32_t NX = 2;
+	static constexpr uint32_t NY = 1;
 };
 
 static VulkanApplication* theApp = nullptr;
@@ -1853,11 +2050,6 @@ int vkapp_create(void* view, int windowWidth, int windowHeight, int framebufferW
 	theApp = new VulkanApplication(view, windowWidth, windowHeight, framebufferWidth, framebufferHeight, resourcePath ? resourcePath : "./", verbose);
 
 	return EXIT_SUCCESS;
-}
-
-bool vkapp_is_initialized()
-{
-	return theApp != nullptr;
 }
 
 void vkapp_draw()

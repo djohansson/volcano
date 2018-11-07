@@ -17,7 +17,7 @@
 			},
 			"args": [
 				"-cache",
-				"-cacheverbose",
+			//	"-cacheverbose",
 				"-summary",
 				"all"
 			],
@@ -53,7 +53,7 @@
 			"args": [
 				"-clean",
 				"-cache",
-				"-cacheverbose",
+			//	"-cacheverbose",
 				"-summary",
 				"all"
 			],

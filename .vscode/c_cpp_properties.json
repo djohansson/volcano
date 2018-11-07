@@ -9,15 +9,17 @@
 				"intelliSenseMode": "clang-x64",
 				"includePath": [
 					"${workspaceFolder}/**",
-					"${env:VULKAN_SDK}/include",
-					"${env:VULKAN_SDK}/Source/layers",
-					"${env:VULKAN_SDK}/Source/loader",
 					"${workspaceRoot}/../glm",
 					"${workspaceRoot}/../volk",
 					"${workspaceRoot}/../VulkanMemoryAllocator/src",
 					"${workspaceRoot}/../stb",
+					"${workspaceRoot}/../tinyobjloader",
+					"${workspaceRoot}/../tinyobjloader/experimental",
 					"${workspaceRoot}/../imgui",
-					"${workspaceRoot}/../glfw/include"
+					"${workspaceRoot}/../glfw/include",
+					"${env:VULKAN_SDK}/include",
+					"${env:VULKAN_SDK}/Source/layers",
+					"${env:VULKAN_SDK}/Source/loader"
 				],
 				"defines": [
 					"-D__WINDOWS__ -DWIN32 -D_WIN32",
@@ -27,17 +29,19 @@
 				"browse": {
 					"path": [
 						"${workspaceFolder}/**",
-						"${env:VULKAN_SDK}/include",
-						"${env:VULKAN_SDK}/Source/layers",
-						"${env:VULKAN_SDK}/Source/loader",
 						"${workspaceRoot}/../glm",
 						"${workspaceRoot}/../volk",
 						"${workspaceRoot}/../VulkanMemoryAllocator/src",
 						"${workspaceRoot}/../stb",
+						"${workspaceRoot}/../tinyobjloader",
+						"${workspaceRoot}/../tinyobjloader/experimental",
 						"${workspaceRoot}/../imgui",
-						"${workspaceRoot}/../glfw/include"
+						"${workspaceRoot}/../glfw/include",
+						"${env:VULKAN_SDK}/include",
+						"${env:VULKAN_SDK}/Source/layers",
+						"${env:VULKAN_SDK}/Source/loader"
 					],	
-					"limitSymbolsToIncludedHeaders": false,
+					"limitSymbolsToIncludedHeaders": true,
 					"databaseFilename": ""
 				}
 			},
@@ -49,13 +53,17 @@
 				"includePath": [
 					"/usr/include",
 					"${workspaceFolder}/**",
-					"${env:VULKAN_SDK}/include",
 					"${workspaceRoot}/../glm",
 					"${workspaceRoot}/../volk",
 					"${workspaceRoot}/../VulkanMemoryAllocator/src",
 					"${workspaceRoot}/../stb",
+					"${workspaceRoot}/../tinyobjloader",
+					"${workspaceRoot}/../tinyobjloader/experimental",
 					"${workspaceRoot}/../imgui",
-					"${workspaceRoot}/../glfw/include"
+					"${workspaceRoot}/../glfw/include",
+					"${env:VULKAN_SDK}/include",
+					"${env:VULKAN_SDK}/Source/layers",
+					"${env:VULKAN_SDK}/Source/loader"
 				],
 				"defines": [
 					"-D__LINUX__ -D__linux__"
@@ -64,15 +72,19 @@
 					"path": [
 						"/usr/include",
 						"${workspaceFolder}/**",
-						"${env:VULKAN_SDK}/include",
 						"${workspaceRoot}/../glm",
 						"${workspaceRoot}/../volk",
 						"${workspaceRoot}/../VulkanMemoryAllocator/src",
 						"${workspaceRoot}/../stb",
+						"${workspaceRoot}/../tinyobjloader",
+						"${workspaceRoot}/../tinyobjloader/experimental",
 						"${workspaceRoot}/../imgui",
-						"${workspaceRoot}/../glfw/include"
+						"${workspaceRoot}/../glfw/include",
+						"${env:VULKAN_SDK}/include",
+						"${env:VULKAN_SDK}/Source/layers",
+						"${env:VULKAN_SDK}/Source/loader"
 					],	
-					"limitSymbolsToIncludedHeaders": false,
+					"limitSymbolsToIncludedHeaders": true,
 					"databaseFilename": ""
 				}
 			}

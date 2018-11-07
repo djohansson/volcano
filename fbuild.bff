@@ -167,9 +167,12 @@ Compiler('Compiler-Clang')
 				+ ' -I$ProjectPath$../volk'
 				+ ' -I$ProjectPath$../VulkanMemoryAllocator/src'
 				+ ' -I$ProjectPath$../stb'
+				+ ' -I$ProjectPath$../tinyobjloader'
+				+ ' -I$ProjectPath$../tinyobjloader/experimental'
 				+ ' -I$ProjectPath$../imgui'
 				+ ' -I$ProjectPath$../glfw/include'
 				+ ' -DVOLCANO_USE_GLFW'
+				+ ' -Wunused-function'
 	#if __WINDOWS__ // to avoid errors in windows headers
 				+ ' -Wno-expansion-to-defined'
 				+ ' -Wno-nonportable-include-path'
@@ -238,7 +241,7 @@ Copy('CopyVulkan')
 #if __WINDOWS__
 	.Source =
 	{
-		'$VulkanSDKPath$/Source/lib/vulkan-1.dll',
+		//'$VulkanSDKPath$/Source/lib/vulkan-1.dll',
 	}
 	.Dest = '$ProjectPath$/bin/windows-x64/'
 #endif //__WINDOWS__

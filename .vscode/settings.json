@@ -57,5 +57,6 @@
 		"xtr1common": "cpp",
 		"xutility": "cpp",
 		"deque": "cpp"
-	}
+	},
+	"C_Cpp.intelliSenseEngineFallback": "Enabled"
 }
