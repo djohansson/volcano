@@ -23,7 +23,7 @@
 			"memory": "cpp",
 			"tuple": "cpp",
 			"type_traits": "cpp",
-			"utility": "cpp",
+			"utility": "cpp",5
 			"xlocnum": "cpp",
 			"algorithm": "cpp",
 			"execution": "cpp",
@@ -83,14 +83,16 @@
 			"xlocbuf": "cpp",
 			"xlocmes": "cpp",
 			"xlocmon": "cpp",
-			"xloctime": "cpp"
+			"xloctime": "cpp",
+			"__config": "cpp",
+			"__nullptr": "cpp"
 		},
 		"workbench.startupEditor": "newUntitledFile",
     	"editor.detectIndentation": false,
 		"editor.insertSpaces": false,
 		"window.zoomLevel": 0,
-		"C_Cpp.loggingLevel": "Debug",
-		"clang.executable": "C:\\Program Files\\LLVM\\bin\\clang.exe",
-		"C_Cpp.clang_format_path": "C:\\Program Files\\LLVM\\bin\\clang-format.exe"
+		"C_Cpp.loggingLevel": "Debug"
+		//"clang.executable": "C:\\Program Files\\LLVM\\bin\\clang.exe",
+		//"C_Cpp.clang_format_path": "C:\\Program Files\\LLVM\\bin\\clang-format.exe"
 	}
 }

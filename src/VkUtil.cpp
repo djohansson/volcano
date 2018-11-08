@@ -90,9 +90,8 @@ int isDeviceSuitable(VkSurfaceKHR surface, VkPhysicalDevice device, SwapChainInf
 
 	assert(!outSwapChainInfo.presentModes.empty());
 
-	// if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && // lets run on
-	// the integrated for now to save battery
-	//    deviceFeatures.samplerAnisotropy)
+	//if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+	if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 	{
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);

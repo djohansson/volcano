@@ -10,7 +10,7 @@
 #	include <GLFW/glfw3.h>
 #endif
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 #	define NOMINMAX
 #	include <wtypes.h>
 #	include <vulkan/vulkan_win32.h>
@@ -226,7 +226,8 @@ public:
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 			myUniformBuffer,
-			myUniformBufferMemory);
+			myUniformBufferMemory,
+			"myUniformBuffer");
 		
 		createDescriptorSet();
 
@@ -449,14 +450,16 @@ private:
 			static_cast<uint32_t>(vertices.size()),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			outModel.myVertexBuffer,
-			outModel.myVertexBufferMemory);
+			outModel.myVertexBufferMemory,
+			filename);
 			
 		createDeviceLocalBuffer(
 			indices.data(),
 			static_cast<uint32_t>(indices.size()),
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			outModel.myIndexBuffer,
-			outModel.myIndexBufferMemory);
+			outModel.myIndexBufferMemory,
+			filename);
 
 		outModel.indexCount = indices.size();
 	}
@@ -486,7 +489,8 @@ private:
 				VK_FORMAT_R8G8B8A8_UNORM,
 				VK_IMAGE_USAGE_SAMPLED_BIT,
 				outTexture.myImage,
-				outTexture.myImageMemory);
+				outTexture.myImageMemory,
+				filename);
 
 			stbi_image_free(imageData);
 
@@ -1256,7 +1260,7 @@ private:
 	}
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags flags,
-		VkBuffer& outBuffer, VmaAllocation& outBufferMemory) const
+		VkBuffer& outBuffer, VmaAllocation& outBufferMemory, const char* debugName) const
 	{
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1265,10 +1269,12 @@ private:
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
 		allocInfo.usage = (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? VMA_MEMORY_USAGE_GPU_ONLY
 			: VMA_MEMORY_USAGE_UNKNOWN;
 		allocInfo.requiredFlags = flags;
 		allocInfo.memoryTypeBits = 0; // memRequirements.memoryTypeBits;
+		allocInfo.pUserData = (void*)debugName;
 
 		CHECK_VK(vmaCreateBuffer(myAllocator, &bufferInfo, &allocInfo, &outBuffer, &outBufferMemory,
 			nullptr));
@@ -1277,7 +1283,7 @@ private:
 	template <typename T>
 	void createDeviceLocalBuffer(const T* bufferData, uint32_t bufferElementCount,
 		VkBufferUsageFlags usage, VkBuffer& outBuffer,
-		VmaAllocation& outBufferMemory) const
+		VmaAllocation& outBufferMemory, const char* debugName) const
 	{
 		assert(bufferData != nullptr);
 		assert(bufferElementCount > 0);
@@ -1286,9 +1292,12 @@ private:
 		// todo: use staging buffer pool, or use scratchpad memory
 		VkBuffer stagingBuffer;
 		VmaAllocation stagingBufferMemory;
+		char buf[64];
+		strcpy(buf, debugName);
+		strcat(buf, "_staging");
 		createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			stagingBuffer, stagingBufferMemory);
+			stagingBuffer, stagingBufferMemory, buf);
 
 		void* data;
 		CHECK_VK(vmaMapMemory(myAllocator, stagingBufferMemory, &data));
@@ -1296,7 +1305,7 @@ private:
 		vmaUnmapMemory(myAllocator, stagingBufferMemory);
 
 		createBuffer(bufferSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outBuffer, outBufferMemory);
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outBuffer, outBufferMemory, debugName);
 
 		copyBuffer(stagingBuffer, outBuffer, bufferSize);
 
@@ -1400,7 +1409,7 @@ private:
 
 	void createImage2D(uint32_t width, uint32_t height, VkFormat format,
 		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryFlags,
-		VkImage& outImage, VmaAllocation& outImageMemory) const
+		VkImage& outImage, VmaAllocation& outImageMemory, const char* debugName) const
 	{
 		VkImageCreateInfo imageInfo = {};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1419,11 +1428,13 @@ private:
 		imageInfo.flags = 0;
 
 		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
 		allocInfo.usage = (memoryFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 			? VMA_MEMORY_USAGE_GPU_ONLY
 			: VMA_MEMORY_USAGE_UNKNOWN;
 		allocInfo.requiredFlags = memoryFlags;
 		allocInfo.memoryTypeBits = 0; // memRequirements.memoryTypeBits;
+		allocInfo.pUserData = (void*)debugName;
 
 		VmaAllocationInfo outAllocInfo = {};
 		CHECK_VK(vmaCreateImage(myAllocator, &imageInfo, &allocInfo, &outImage, &outImageMemory,
@@ -1433,16 +1444,19 @@ private:
 	template <typename T>
 	void createDeviceLocalImage2D(const T* imageData, uint32_t width, uint32_t height,
 		VkFormat format, VkImageUsageFlags usage,
-		VkImage& outImage, VmaAllocation& outImageMemory) const
+		VkImage& outImage, VmaAllocation& outImageMemory, const char* debugName) const
 	{
 		uint32_t pixelSizeBytes = getFormatSize(format); // todo
 		VkDeviceSize imageSize = width * height * pixelSizeBytes;
 
 		VkBuffer stagingBuffer;
 		VmaAllocation stagingBufferMemory;
+		char buf[64];
+		strcpy(buf, debugName);
+		strcat(buf, "_staging");
 		createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			stagingBuffer, stagingBufferMemory);
+			stagingBuffer, stagingBufferMemory, buf);
 
 		void* data;
 		CHECK_VK(vmaMapMemory(myAllocator, stagingBufferMemory, &data));
@@ -1450,7 +1464,7 @@ private:
 		vmaUnmapMemory(myAllocator, stagingBufferMemory);
 
 		createImage2D(width, height, format, VK_IMAGE_TILING_OPTIMAL, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outImage, outImageMemory);
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, outImage, outImageMemory, debugName);
 
 		transitionImageLayout(outImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1605,7 +1619,8 @@ private:
 			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			myDepthImage,
-			myDepthImageMemory);
+			myDepthImageMemory,
+			"myDepthImage");
 
 		myDepthImageView = createImageView2D(myDepthImage, myDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -1799,7 +1814,7 @@ private:
 			secBeginInfo.pInheritanceInfo = &inherit;
 			CHECK_VK(vkBeginCommandBuffer(cmd, &secBeginInfo));
 
-			// bind pipeline and vertex/index buffers used drawing spinning logos
+			// bind pipeline and vertex/index buffers
 			vkCmdBindPipeline(
 				cmd,
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1812,7 +1827,7 @@ private:
 			vkCmdBindIndexBuffer(cmd, myHouseModel.myIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
-		// draw spinning geometry using secondary command buffers
+		// draw geometry using secondary command buffers
 		{
 			uint32_t segmentDrawCount = drawCount / segmentCount;
 			if (drawCount % segmentCount)
@@ -2105,8 +2120,8 @@ private:
 	bool myUIEnableFlag = false;
 	bool myCreateFrameResourcesFlag = false;
 
-	static constexpr uint32_t NX = 1;
-	static constexpr uint32_t NY = 1;
+	static constexpr uint32_t NX = 8;
+	static constexpr uint32_t NY = 4;
 };
 
 static VulkanApplication* theApp = nullptr;

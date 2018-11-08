@@ -84,6 +84,7 @@ Compiler('Compiler-Clang')
 #if __OSX__
 		+ ' -D__APPLE__'
 		+ ' -D__OSX__'
+		+ ' -stdlib=libc++'
 #endif //__LINUX__
 #if __LINUX__
 		+ ' -D__LINUX__'
@@ -97,10 +98,10 @@ Compiler('Compiler-Clang')
 	.BaseLinkerOptions = '"%1" -o "%2" -g'
 		+ .BaseLibPaths
 	.LinkerOptions = .BaseLinkerOptions
-#if !__WINDOWS__
-	+ ' -lc++'
-#else
+#if __WINDOWS__
 	+ ' -lstdc++' // I think this gets translated to windows sdk headers/libs somehow
+#else
+	+ ' -lc++'
 #endif
 	
 	.LibrarianOptions = 'rcs "%2" "%1"'
@@ -153,8 +154,12 @@ Compiler('Compiler-Clang')
 .ProjectPath = './'
 .IntermediateFilePath = './temp'
 
+#if __OSX__ // temp
+.VulkanSDKPath = '/usr/local'
+#else
 #import VULKAN_SDK
 .VulkanSDKPath = '$VULKAN_SDK$'
+#endif
 
 {
 	ForEach(.Config in .Clang_x64_Configs)
@@ -218,6 +223,7 @@ Compiler('Compiler-Clang')
 				+ ' -lm'
 				+ ' -ldl'
 				+ ' -lpthread'
+				+ ' -lc++fs'
 				+ ' -lvulkan'
 				+ ' -lglfw3'
 				+ ' -lX11'
@@ -226,6 +232,7 @@ Compiler('Compiler-Clang')
 			.LinkerOutput = 'volcano-$Config$'
 			.LinkerOptions + ' -L$VulkanSDKPath$/lib'
 				+ ' -L$ProjectPath$../glfw/build/src'
+				+ ' -lc++fs'
 				+ ' -lvulkan'
 				+ ' -lglfw3'
 				+ ' -framework Cocoa'
@@ -237,40 +244,10 @@ Compiler('Compiler-Clang')
 	}
 }
 
-Copy('CopyVulkan')
-{
-#if __WINDOWS__
-	.Source =
-	{
-		//'$VulkanSDKPath$/Source/lib/vulkan-1.dll',
-	}
-	.Dest = '$ProjectPath$/bin/windows-x64/'
-#endif //__WINDOWS__
-#if __LINUX__
-	.Source =
-	{
-	//	'$VulkanSDKPath$/lib/libvulkan.so',
-	//	'$VulkanSDKPath$/lib/libvulkan.so.1',
-	//	'$VulkanSDKPath$/lib/libvulkan.so.1.1.82'
-	}
-	.Dest = '$ProjectPath$/bin/linux-x64/'
-#endif //__LINUX__
-#if __OSX__
-	.Source =
-	{
-		'$VulkanSDKPath$/lib/libvulkan.dylib',
-		'$VulkanSDKPath$/lib/libvulkan.1.dylib',
-		'$VulkanSDKPath$/lib/libvulkan.1.1.82.dylib'
-	}
-	.Dest = '$ProjectPath$/bin/osx-x64/'
-#endif //__OSX__
-}
-
 Alias('release')
 {
 	.Targets =
 	{
-		'CopyVulkan',
 		'$ProjectName$-Lib-Release',
 		'$ProjectName$-Release'
 	}
@@ -280,7 +257,6 @@ Alias('profile')
 {
 	.Targets =
 	{
-		'CopyVulkan',
 		'$ProjectName$-Lib-Profile',
 		'$ProjectName$-Profile'
 	}
@@ -290,7 +266,6 @@ Alias('debug')
 {
 	.Targets =
 	{
-		'CopyVulkan',
 		'$ProjectName$-Lib-Debug',
 		'$ProjectName$-Debug'
 	}
